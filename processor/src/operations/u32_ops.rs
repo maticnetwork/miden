@@ -240,7 +240,7 @@ mod tests {
         let hi = a >> 32;
         let lo = (a as u32) as u64;
 
-        process.execute_op(Operation::U32split).unwrap();
+        process.execute_op(&Operation::U32split).unwrap();
         let mut expected = [Felt::ZERO; 16];
         expected[0] = Felt::new(hi);
         expected[1] = Felt::new(lo);
@@ -253,7 +253,7 @@ mod tests {
         let hi = b >> 32;
         let lo = (b as u32) as u64;
 
-        process.execute_op(Operation::U32split).unwrap();
+        process.execute_op(&Operation::U32split).unwrap();
         let mut expected = [Felt::ZERO; 16];
         expected[0] = Felt::new(hi);
         expected[1] = Felt::new(lo);
@@ -271,7 +271,7 @@ mod tests {
         let (a, b, c, d) = init_stack_rand(&mut process);
         let (result, over) = a.overflowing_add(b);
 
-        process.execute_op(Operation::U32add).unwrap();
+        process.execute_op(&Operation::U32add).unwrap();
         let expected = build_expected(&[over as u32, result, c, d]);
         assert_eq!(expected, process.stack.trace_state());
 
@@ -283,7 +283,7 @@ mod tests {
         init_stack_with(&mut process, &[a as u64, b as u64]);
         let (result, over) = a.overflowing_add(b);
 
-        process.execute_op(Operation::U32add).unwrap();
+        process.execute_op(&Operation::U32add).unwrap();
         let expected = build_expected(&[over as u32, result]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -304,7 +304,7 @@ mod tests {
         let lo = result as u32;
         assert!(hi <= 1);
 
-        process.execute_op(Operation::U32addc).unwrap();
+        process.execute_op(&Operation::U32addc).unwrap();
         let expected = build_expected(&[hi, lo, d as u32]);
         assert_eq!(expected, process.stack.trace_state());
 
@@ -315,7 +315,7 @@ mod tests {
 
         let mut process = Process::new_dummy();
         init_stack_with(&mut process, &[c, b, a]);
-        assert!(process.execute_op(Operation::U32addc).is_err());
+        assert!(process.execute_op(&Operation::U32addc).is_err());
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
         let (a, b, c, d) = init_stack_rand(&mut process);
         let (result, under) = b.overflowing_sub(a);
 
-        process.execute_op(Operation::U32sub).unwrap();
+        process.execute_op(&Operation::U32sub).unwrap();
         let expected = build_expected(&[under as u32, result, c, d]);
         assert_eq!(expected, process.stack.trace_state());
 
@@ -337,7 +337,7 @@ mod tests {
         init_stack_with(&mut process, &[a as u64, b as u64]);
         let (result, under) = a.overflowing_sub(b);
 
-        process.execute_op(Operation::U32sub).unwrap();
+        process.execute_op(&Operation::U32sub).unwrap();
         let expected = build_expected(&[under as u32, result]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -350,7 +350,7 @@ mod tests {
         let hi = (result >> 32) as u32;
         let lo = result as u32;
 
-        process.execute_op(Operation::U32mul).unwrap();
+        process.execute_op(&Operation::U32mul).unwrap();
         let expected = build_expected(&[hi, lo, c, d]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -363,7 +363,7 @@ mod tests {
         let hi = (result >> 32) as u32;
         let lo = result as u32;
 
-        process.execute_op(Operation::U32madd).unwrap();
+        process.execute_op(&Operation::U32madd).unwrap();
         let expected = build_expected(&[hi, lo, d]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -375,7 +375,7 @@ mod tests {
         let q = b / a;
         let r = b % a;
 
-        process.execute_op(Operation::U32div).unwrap();
+        process.execute_op(&Operation::U32div).unwrap();
         let expected = build_expected(&[r, q, c, d]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -388,7 +388,7 @@ mod tests {
         let mut process = Process::new_dummy();
         let (a, b, c, d) = init_stack_rand(&mut process);
 
-        process.execute_op(Operation::U32and).unwrap();
+        process.execute_op(&Operation::U32and).unwrap();
         let expected = build_expected(&[a & b, c, d]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -398,7 +398,7 @@ mod tests {
         let mut process = Process::new_dummy();
         let (a, b, c, d) = init_stack_rand(&mut process);
 
-        process.execute_op(Operation::U32or).unwrap();
+        process.execute_op(&Operation::U32or).unwrap();
         let expected = build_expected(&[a | b, c, d]);
         assert_eq!(expected, process.stack.trace_state());
     }
@@ -408,7 +408,7 @@ mod tests {
         let mut process = Process::new_dummy();
         let (a, b, c, d) = init_stack_rand(&mut process);
 
-        process.execute_op(Operation::U32xor).unwrap();
+        process.execute_op(&Operation::U32xor).unwrap();
         let expected = build_expected(&[a ^ b, c, d]);
         assert_eq!(expected, process.stack.trace_state());
     }

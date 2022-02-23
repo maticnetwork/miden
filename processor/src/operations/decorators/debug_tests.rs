@@ -42,7 +42,7 @@ fn test_print_all(logger: &mut Logger) {
     );
 
     process
-        .execute_op(Operation::Debug(DebugOptions::All))
+        .execute_op(&Operation::Debug(DebugOptions::All))
         .unwrap();
 
     assert_eq!(logger.len(), 7);
@@ -65,7 +65,7 @@ fn test_print_mem(logger: &mut Logger) {
 
     // Print all memory
     process
-        .execute_op(Operation::Debug(DebugOptions::Memory(None, None)))
+        .execute_op(&Operation::Debug(DebugOptions::Memory(None, None)))
         .unwrap();
 
     assert_clock(&process, logger);
@@ -83,7 +83,7 @@ fn test_print_mem(logger: &mut Logger) {
 
     // Print memory at address 1
     process
-        .execute_op(Operation::Debug(DebugOptions::Memory(Some(1), None)))
+        .execute_op(&Operation::Debug(DebugOptions::Memory(Some(1), None)))
         .unwrap();
 
     assert_clock(&process, logger);
@@ -95,7 +95,7 @@ fn test_print_mem(logger: &mut Logger) {
 
     // Print memory from address 1 to 4
     process
-        .execute_op(Operation::Debug(DebugOptions::Memory(Some(1), Some(4))))
+        .execute_op(&Operation::Debug(DebugOptions::Memory(Some(1), Some(4))))
         .unwrap();
 
     assert_clock(&process, logger);
@@ -109,7 +109,7 @@ fn test_print_mem(logger: &mut Logger) {
 
     // Print unused memory
     process
-        .execute_op(Operation::Debug(DebugOptions::Memory(Some(3), None)))
+        .execute_op(&Operation::Debug(DebugOptions::Memory(Some(3), None)))
         .unwrap();
     assert_clock(&process, logger);
     assert_eq!(logger.len(), 2);
@@ -152,7 +152,7 @@ fn test_print_stack(logger: &mut Logger) {
 
     // Print all stack
     process
-        .execute_op(Operation::Debug(DebugOptions::Stack(None)))
+        .execute_op(&Operation::Debug(DebugOptions::Stack(None)))
         .unwrap();
 
     assert_clock(&process, logger);
@@ -170,7 +170,7 @@ fn test_print_stack(logger: &mut Logger) {
 
     // Print all stack
     process
-        .execute_op(Operation::Debug(DebugOptions::Stack(None)))
+        .execute_op(&Operation::Debug(DebugOptions::Stack(None)))
         .unwrap();
     assert_clock(&process, logger);
     stack_inputs.reverse();
@@ -178,14 +178,14 @@ fn test_print_stack(logger: &mut Logger) {
 
     // Print top 3 items in stack
     process
-        .execute_op(Operation::Debug(DebugOptions::Stack(Some(3))))
+        .execute_op(&Operation::Debug(DebugOptions::Stack(Some(3))))
         .unwrap();
     assert_clock(&process, logger);
     assert_stack(3, 18, &stack_inputs, logger);
 
     // Print top 18 items in stack (includes overflow)
     process
-        .execute_op(Operation::Debug(DebugOptions::Stack(Some(18))))
+        .execute_op(&Operation::Debug(DebugOptions::Stack(Some(18))))
         .unwrap();
     assert_clock(&process, logger);
     assert_stack(18, 18, &stack_inputs, logger);
@@ -202,7 +202,7 @@ fn test_print_local(logger: &mut Logger) {
 
     // Print local
     process
-        .execute_op(Operation::Debug(DebugOptions::Local(None)))
+        .execute_op(&Operation::Debug(DebugOptions::Local(None)))
         .unwrap();
 
     assert_clock(&process, logger);

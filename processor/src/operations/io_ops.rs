@@ -153,7 +153,7 @@ mod tests {
 
         // push one item onto the stack
         let op = Operation::Push(Felt::ONE);
-        process.execute_op(op).unwrap();
+        process.execute_op(&op).unwrap();
         let mut expected = [Felt::ZERO; 16];
         expected[0] = Felt::ONE;
 
@@ -163,7 +163,7 @@ mod tests {
 
         // push another item onto the stack
         let op = Operation::Push(Felt::new(3));
-        process.execute_op(op).unwrap();
+        process.execute_op(&op).unwrap();
         let mut expected = [Felt::ZERO; 16];
         expected[0] = Felt::new(3);
         expected[1] = Felt::ONE;
@@ -218,12 +218,12 @@ mod tests {
 
         // push four zeros onto the stack
         for _ in 0..4 {
-            process.execute_op(Operation::Pad).unwrap();
+            process.execute_op(&Operation::Pad).unwrap();
         }
 
         // push the address onto the stack and load the word
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
-        process.execute_op(Operation::LoadW).unwrap();
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::LoadW).unwrap();
 
         let expected_stack = build_expected_stack(&[7, 5, 3, 1, 7, 5, 3, 1]);
         assert_eq!(expected_stack, process.stack.trace_state());
@@ -240,37 +240,37 @@ mod tests {
     fn op_read() {
         // reading from tape should push the value onto the stack
         let mut process = Process::new_dummy_with_advice_tape(&[3]);
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
-        process.execute_op(Operation::Read).unwrap();
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::Read).unwrap();
         let expected = build_expected_stack(&[3, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // reading again should result in an error because advice tape is empty
-        assert!(process.execute_op(Operation::Read).is_err());
+        assert!(process.execute_op(&Operation::Read).is_err());
     }
 
     #[test]
     fn op_readw() {
         // reading from tape should overwrite top 4 values
         let mut process = Process::new_dummy_with_advice_tape(&[3, 4, 5, 6]);
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::ReadW).unwrap();
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::ReadW).unwrap();
         let expected = build_expected_stack(&[6, 5, 4, 3, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // reading again should result in an error because advice tape is empty
-        assert!(process.execute_op(Operation::ReadW).is_err());
+        assert!(process.execute_op(&Operation::ReadW).is_err());
 
         // should return an error if the stack has fewer than 4 values
         let mut process = Process::new_dummy_with_advice_tape(&[3, 4, 5, 6]);
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        assert!(process.execute_op(Operation::ReadW).is_err());
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        assert!(process.execute_op(&Operation::ReadW).is_err());
     }
 
     // ENVIRONMENT INPUT TESTS
@@ -280,20 +280,20 @@ mod tests {
     fn op_sdepth() {
         // stack is empty
         let mut process = Process::new_dummy();
-        process.execute_op(Operation::SDepth).unwrap();
+        process.execute_op(&Operation::SDepth).unwrap();
         let expected = build_expected_stack(&[0]);
         assert_eq!(expected, process.stack.trace_state());
         assert_eq!(1, process.stack.depth());
 
         // stack has one item
-        process.execute_op(Operation::SDepth).unwrap();
+        process.execute_op(&Operation::SDepth).unwrap();
         let expected = build_expected_stack(&[1, 0]);
         assert_eq!(expected, process.stack.trace_state());
         assert_eq!(2, process.stack.depth());
 
         // stack has 3 items
-        process.execute_op(Operation::Pad).unwrap();
-        process.execute_op(Operation::SDepth).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        process.execute_op(&Operation::SDepth).unwrap();
         let expected = build_expected_stack(&[3, 0, 1, 0]);
         assert_eq!(expected, process.stack.trace_state());
         assert_eq!(4, process.stack.depth());
@@ -304,11 +304,11 @@ mod tests {
 
     fn store_value(process: &mut Process, addr: u64, value: [Felt; 4]) {
         for &value in value.iter() {
-            process.execute_op(Operation::Push(value)).unwrap();
+            process.execute_op(&Operation::Push(value)).unwrap();
         }
         let addr = Felt::new(addr);
-        process.execute_op(Operation::Push(addr)).unwrap();
-        process.execute_op(Operation::StoreW).unwrap();
+        process.execute_op(&Operation::Push(addr)).unwrap();
+        process.execute_op(&Operation::StoreW).unwrap();
     }
 
     fn build_expected_stack(values: &[u64]) -> [Felt; 16] {

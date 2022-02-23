@@ -5,6 +5,9 @@ mod advice;
 pub use advice::AdviceInjector;
 mod debug;
 pub use debug::DebugOptions;
+mod proc;
+pub use proc::ProcInfo;
+
 #[cfg(test)]
 mod tests;
 
@@ -12,7 +15,7 @@ mod tests;
 // ================================================================================================
 
 /// TODO: add docs
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operation {
     // ----- system operations --------------------------------------------------------------------
     /// Advances cycle counter, but does not change the state of user stack.
@@ -361,14 +364,25 @@ pub enum Operation {
     // ----- decorators ---------------------------------------------------------------------------
     /// Prints out the state of the VM. This operation has no effect on the VM state, and does not
     /// advance VM clock.
-    ///
-    /// TODO: add debug options to specify what is to be printed out.
     Debug(DebugOptions),
 
     /// Injects zero or more values at the head of the advice tape as specified by the injector.
     /// This operation affects only the advice tape, but has no effect on other VM components
     /// (e.g., stack, memory), and does not advance VM clock.
     Advice(AdviceInjector),
+
+    /// Marks the start of a new procedure. This operation is used to make the VM aware of
+    /// procedure boundaries (primarily for debug purposes). The operation has no effect on
+    /// the VM state, and does not advance VM clock.
+    /// Internally in the VM, this operation pushes procedure information (name, number of locals,
+    ///  etc.) onto procedure stack.
+    ProcStart(ProcInfo),
+
+    /// Marks the end of the executing procedure. This operation is used to make the VM aware of
+    /// procedure boundaries (primarily for debug purposes). The operation has no effect on the VM
+    /// state, and does not advance VM clock. Internally in the VM, this operation pops procedure
+    /// information from the procedure stack.
+    ProcEnd,
 }
 
 impl Operation {
@@ -478,6 +492,8 @@ impl Operation {
 
             Self::Debug(_) => None,
             Self::Advice(_) => None,
+            Self::ProcStart(_) => Some(0b1111_0000),
+            Self::ProcEnd => Some(0b1111_0001),
         }
     }
 
@@ -619,6 +635,8 @@ impl fmt::Display for Operation {
             // ----- decorators -------------------------------------------------------------------
             Self::Debug(options) => write!(f, "debug({})", options),
             Self::Advice(injector) => write!(f, "advice({})", injector),
+            Self::ProcStart(info) => write!(f, "procstart({})", info),
+            Self::ProcEnd => write!(f, "procend"),
         }
     }
 }

@@ -115,7 +115,7 @@ fn parse_proc(
     tokens.advance();
 
     // parse procedure body, and handle memory allocation/deallocation of locals if any are declared
-    let root = parse_proc_blocks(tokens, proc_map, num_locals)?;
+    let root = parse_proc_blocks(tokens, proc_map, &label, num_locals)?;
 
     // consume the 'end' token
     match tokens.read() {

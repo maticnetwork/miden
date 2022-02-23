@@ -230,7 +230,7 @@ mod tests {
         let expected: [Felt; STATE_WIDTH] = build_expected_perm(&inputs);
 
         init_stack_with(&mut process, &inputs);
-        process.execute_op(Operation::RpPerm).unwrap();
+        process.execute_op(&Operation::RpPerm).unwrap();
         assert_eq!(expected, &process.stack.trace_state()[0..12]);
 
         // --- test hashing 8 random values -------------------------------------------------------
@@ -242,7 +242,7 @@ mod tests {
         let expected: [Felt; STATE_WIDTH] = build_expected_perm(&inputs);
 
         init_stack_with(&mut process, &inputs);
-        process.execute_op(Operation::RpPerm).unwrap();
+        process.execute_op(&Operation::RpPerm).unwrap();
 
         assert_eq!(expected, &process.stack.trace_state()[0..12]);
 
@@ -258,7 +258,7 @@ mod tests {
         inputs.extend_from_slice(&values);
 
         init_stack_with(&mut process, &inputs);
-        process.execute_op(Operation::RpPerm).unwrap();
+        process.execute_op(&Operation::RpPerm).unwrap();
         assert_eq!(expected, &process.stack.trace_state()[12..16]);
     }
 
@@ -284,7 +284,7 @@ mod tests {
         let inputs = ProgramInputs::new(&stack_inputs, &[], vec![tree.clone()]).unwrap();
         let mut process = Process::new(inputs);
 
-        process.execute_op(Operation::MpVerify).unwrap();
+        process.execute_op(&Operation::MpVerify).unwrap();
         let expected_stack = build_expected(&[
             Felt::new(tree.depth() as u64),
             Felt::new(index as u64),
@@ -333,7 +333,7 @@ mod tests {
         let mut process = Process::new(inputs);
 
         // update the Merkle tree and discard the old copy
-        process.execute_op(Operation::MrUpdate(false)).unwrap();
+        process.execute_op(&Operation::MrUpdate(false)).unwrap();
         let expected_stack = build_expected(&[
             Felt::new(tree.depth() as u64),
             Felt::new(node_index as u64),
@@ -390,7 +390,7 @@ mod tests {
         let mut process = Process::new(inputs);
 
         // update the Merkle tree but keep the old copy
-        process.execute_op(Operation::MrUpdate(true)).unwrap();
+        process.execute_op(&Operation::MrUpdate(true)).unwrap();
         let expected_stack = build_expected(&[
             Felt::new(tree.depth() as u64),
             Felt::new(node_index as u64),

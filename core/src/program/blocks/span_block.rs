@@ -350,9 +350,9 @@ mod tests {
         assert_eq!(batch0_groups, batch0.groups);
 
         let batch1 = &batches[1];
-        assert_eq!(vec![ops[9]], batch1.ops);
+        assert_eq!(vec![ops[9].clone()], batch1.ops);
         let mut batch1_groups = [Felt::ZERO; BATCH_SIZE];
-        batch1_groups[0] = build_group(&[ops[9]]);
+        batch1_groups[0] = build_group(&[ops[9].clone()]);
         batch1_groups[1] = Felt::new(7);
         assert_eq!(batch1_groups, batch1.groups);
 
@@ -412,7 +412,7 @@ mod tests {
         assert_eq!(expected_ops, batch.ops);
         let batch_groups = [
             build_group(&ops[..9]),
-            build_group(&[Operation::Noop, ops[9]]),
+            build_group(&[Operation::Noop, ops[9].clone()]),
             Felt::new(11),
             Felt::ZERO,
             Felt::ZERO,

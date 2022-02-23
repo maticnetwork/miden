@@ -1,5 +1,5 @@
 use super::{
-    AdviceInjector, DebugOptions, ExecutionError, Felt, FieldElement, Operation, Process,
+    AdviceInjector, DebugOptions, ExecutionError, Felt, FieldElement, Operation, ProcInfo, Process,
     StarkField, Word,
 };
 
@@ -17,7 +17,7 @@ mod utils;
 
 impl Process {
     /// Executes the specified operation.
-    pub(super) fn execute_op(&mut self, op: Operation) -> Result<(), ExecutionError> {
+    pub(super) fn execute_op(&mut self, op: &Operation) -> Result<(), ExecutionError> {
         // make sure there is enough memory allocated to hold the execution trace
         self.ensure_trace_capacity();
 
@@ -113,7 +113,7 @@ impl Process {
             Operation::CSwapW => self.op_cswapw()?,
 
             // ----- input / output ---------------------------------------------------------------
-            Operation::Push(value) => self.op_push(value)?,
+            Operation::Push(value) => self.op_push(*value)?,
 
             Operation::Read => self.op_read()?,
             Operation::ReadW => self.op_readw()?,
@@ -129,11 +129,13 @@ impl Process {
             // ----- cryptographic operations -----------------------------------------------------
             Operation::RpPerm => self.op_rpperm()?,
             Operation::MpVerify => self.op_mpverify()?,
-            Operation::MrUpdate(copy) => self.op_mrupdate(copy)?,
+            Operation::MrUpdate(copy) => self.op_mrupdate(*copy)?,
 
             // ----- decorators -------------------------------------------------------------------
             Operation::Debug(options) => self.op_debug(options)?,
-            Operation::Advice(injector) => self.op_advice(injector)?,
+            Operation::Advice(injector) => self.op_advice(*injector)?,
+            Operation::ProcStart(ref info) => self.op_proc_start(info)?,
+            Operation::ProcEnd => self.op_proc_end()?,
         }
 
         // increment the clock cycle, unless we are processing a decorator
@@ -184,7 +186,7 @@ impl Process {
 fn init_stack_with(process: &mut Process, values: &[u64]) {
     let mut result = Vec::with_capacity(values.len());
     for value in values.iter().map(|&v| Felt::new(v)) {
-        process.execute_op(Operation::Push(value)).unwrap();
+        process.execute_op(&Operation::Push(value)).unwrap();
         result.push(value);
     }
 }

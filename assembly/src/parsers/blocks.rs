@@ -1,5 +1,5 @@
 use super::{parse_op_token, AssemblyError, CodeBlock, Operation, Token, TokenStream};
-use vm_core::Felt;
+use vm_core::{Felt, ProcInfo};
 use winter_utils::{
     collections::{BTreeMap, Vec},
     group_vector_elements,
@@ -40,10 +40,20 @@ pub fn parse_code_blocks(
 pub fn parse_proc_blocks(
     tokens: &mut TokenStream,
     proc_map: &BTreeMap<String, CodeBlock>,
+    proc_name: &str,
     num_proc_locals: u32,
 ) -> Result<CodeBlock, AssemblyError> {
+    let proc_info = ProcInfo {
+        num_locals: num_proc_locals as usize,
+        name: String::from(proc_name),
+    };
+    // define the proc start block with procedure tracking info
+    let proc_start_block = CodeBlock::new_span(vec![Operation::ProcStart(proc_info)]);
     // parse the procedure body
-    let body = parse_code_blocks(tokens, proc_map, num_proc_locals)?;
+    let mut body = parse_code_blocks(tokens, proc_map, num_proc_locals)?;
+    // insert proc end to remove tracking info from proc stack
+    let proc_end_block = CodeBlock::new_span(vec![Operation::ProcEnd]);
+    body = combine_blocks(vec![proc_start_block, body, proc_end_block]);
 
     if num_proc_locals == 0 {
         // if no allocation of locals is required, return the procedure body

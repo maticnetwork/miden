@@ -1,4 +1,6 @@
-use super::{AdviceInjector, DebugOptions, ExecutionError, Felt, Process, StarkField, Word};
+use super::{
+    AdviceInjector, DebugOptions, ExecutionError, Felt, ProcInfo, Process, StarkField, Word,
+};
 use core::ops::RangeInclusive;
 use log::info;
 
@@ -12,13 +14,25 @@ impl Process {
     // DEBUGGING
     // --------------------------------------------------------------------------------------------
 
+    /// Inject procedure information into the procedure stack for tracking.
+    pub fn op_proc_start(&mut self, info: &ProcInfo) -> Result<(), ExecutionError> {
+        self.proc_stack.push(info.clone());
+        Ok(())
+    }
+
+    /// Remove procedure information from the procedure stack on procedure exit.
+    pub fn op_proc_end(&mut self) -> Result<(), ExecutionError> {
+        self.proc_stack.pop().expect("no procedures in stack");
+        Ok(())
+    }
+
     /// Prints out debugging information based on options passed.
-    pub fn op_debug(&mut self, options: DebugOptions) -> Result<(), ExecutionError> {
+    pub fn op_debug(&mut self, options: &DebugOptions) -> Result<(), ExecutionError> {
         info!(
             "---------------------cycle: {}---------------------",
             self.system.clk()
         );
-        match options {
+        match *options {
             DebugOptions::All => {
                 self.print_stack(None);
                 self.print_mem(None, None);
@@ -182,13 +196,13 @@ mod tests {
 
         // inject the node into the advice tape
         process
-            .execute_op(Operation::Advice(AdviceInjector::MerkleNode))
+            .execute_op(&Operation::Advice(AdviceInjector::MerkleNode))
             .unwrap();
         // read the node from the tape onto the stack
-        process.execute_op(Operation::Read).unwrap();
-        process.execute_op(Operation::Read).unwrap();
-        process.execute_op(Operation::Read).unwrap();
-        process.execute_op(Operation::Read).unwrap();
+        process.execute_op(&Operation::Read).unwrap();
+        process.execute_op(&Operation::Read).unwrap();
+        process.execute_op(&Operation::Read).unwrap();
+        process.execute_op(&Operation::Read).unwrap();
 
         let expected_stack = build_expected(&[
             leaves[1][3],

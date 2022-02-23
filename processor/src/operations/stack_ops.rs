@@ -305,12 +305,12 @@ mod tests {
         let mut process = Process::new_dummy();
 
         // push one item onto the stack
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
         let expected = build_expected(&[1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // pad the stack
-        process.execute_op(Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
         let expected = build_expected(&[0, 1]);
 
         assert_eq!(2, process.stack.depth());
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(expected, process.stack.trace_state());
 
         // pad the stack again
-        process.execute_op(Operation::Pad).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
         let expected = build_expected(&[0, 0, 1]);
 
         assert_eq!(3, process.stack.depth());
@@ -333,19 +333,19 @@ mod tests {
         init_stack_with(&mut process, &[1, 2]);
 
         // drop the first value
-        process.execute_op(Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
         let expected = build_expected(&[1]);
         assert_eq!(expected, process.stack.trace_state());
         assert_eq!(1, process.stack.depth());
 
         // drop the next value
-        process.execute_op(Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
         let expected = build_expected(&[]);
         assert_eq!(expected, process.stack.trace_state());
         assert_eq!(0, process.stack.depth());
 
         // the stack is empty, drop should result in an error
-        assert!(process.execute_op(Operation::Drop).is_err());
+        assert!(process.execute_op(&Operation::Drop).is_err());
     }
 
     #[test]
@@ -353,45 +353,45 @@ mod tests {
         let mut process = Process::new_dummy();
 
         // calling DUP on an empty stack should be an error
-        assert!(process.execute_op(Operation::Dup0).is_err());
+        assert!(process.execute_op(&Operation::Dup0).is_err());
 
         // push one item onto the stack
-        process.execute_op(Operation::Push(Felt::ONE)).unwrap();
+        process.execute_op(&Operation::Push(Felt::ONE)).unwrap();
         let expected = build_expected(&[1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // duplicate it
-        process.execute_op(Operation::Dup0).unwrap();
+        process.execute_op(&Operation::Dup0).unwrap();
         let expected = build_expected(&[1, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // duplicating non-existent item should be an error
-        assert!(process.execute_op(Operation::Dup2).is_err());
+        assert!(process.execute_op(&Operation::Dup2).is_err());
 
         // put 15 more items onto the stack
         let mut expected = [Felt::ONE; 16];
         for i in 2..17 {
-            process.execute_op(Operation::Push(Felt::new(i))).unwrap();
+            process.execute_op(&Operation::Push(Felt::new(i))).unwrap();
             expected[16 - i as usize] = Felt::new(i);
         }
         assert_eq!(expected, process.stack.trace_state());
 
         // duplicate last stack item
-        process.execute_op(Operation::Dup15).unwrap();
+        process.execute_op(&Operation::Dup15).unwrap();
         assert_eq!(Felt::ONE, process.stack.trace_state()[0]);
         assert_eq!(&expected[..15], &process.stack.trace_state()[1..]);
 
         // duplicate 8th stack item
-        process.execute_op(Operation::Dup7).unwrap();
+        process.execute_op(&Operation::Dup7).unwrap();
         assert_eq!(Felt::new(10), process.stack.trace_state()[0]);
         assert_eq!(Felt::new(1), process.stack.trace_state()[1]);
         assert_eq!(&expected[..14], &process.stack.trace_state()[2..]);
 
         // remove 4 items off the stack
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
 
         assert_eq!(15, process.stack.depth());
 
@@ -406,14 +406,14 @@ mod tests {
         let mut process = Process::new_dummy();
         init_stack_with(&mut process, &[1, 2, 3]);
 
-        process.execute_op(Operation::Swap).unwrap();
+        process.execute_op(&Operation::Swap).unwrap();
         let expected = build_expected(&[2, 3, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swapping fewer than 2 items should be an error
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::Swap).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::Swap).is_err());
     }
 
     #[test]
@@ -422,14 +422,14 @@ mod tests {
         let mut process = Process::new_dummy();
         init_stack_with(&mut process, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-        process.execute_op(Operation::SwapW).unwrap();
+        process.execute_op(&Operation::SwapW).unwrap();
         let expected = build_expected(&[5, 4, 3, 2, 9, 8, 7, 6, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swapping fewer than 8 items should be an error
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::SwapW).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::SwapW).is_err());
     }
 
     #[test]
@@ -438,14 +438,14 @@ mod tests {
         let mut process = Process::new_dummy();
         init_stack_with(&mut process, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 
-        process.execute_op(Operation::SwapW2).unwrap();
+        process.execute_op(&Operation::SwapW2).unwrap();
         let expected = build_expected(&[5, 4, 3, 2, 9, 8, 7, 6, 13, 12, 11, 10, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swapping fewer than 12 items should be an error
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::SwapW2).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::SwapW2).is_err());
     }
 
     #[test]
@@ -457,18 +457,18 @@ mod tests {
             &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
         );
 
-        process.execute_op(Operation::SwapW3).unwrap();
+        process.execute_op(&Operation::SwapW3).unwrap();
         let expected = build_expected(&[5, 4, 3, 2, 13, 12, 11, 10, 9, 8, 7, 6, 17, 16, 15, 14]);
         assert_eq!(expected, process.stack.trace_state());
 
         // value should remain on the overflow table
-        process.execute_op(Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
         let expected = build_expected(&[4, 3, 2, 13, 12, 11, 10, 9, 8, 7, 6, 17, 16, 15, 14, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swapping fewer than 12 items should be an error
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::SwapW3).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::SwapW3).is_err());
     }
 
     #[test]
@@ -481,32 +481,32 @@ mod tests {
         );
 
         // movup2
-        process.execute_op(Operation::MovUp2).unwrap();
+        process.execute_op(&Operation::MovUp2).unwrap();
         let expected = build_expected(&[3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movup3
-        process.execute_op(Operation::MovUp3).unwrap();
+        process.execute_op(&Operation::MovUp3).unwrap();
         let expected = build_expected(&[4, 3, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movup7
-        process.execute_op(Operation::MovUp7).unwrap();
+        process.execute_op(&Operation::MovUp7).unwrap();
         let expected = build_expected(&[8, 4, 3, 1, 2, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movup15
-        process.execute_op(Operation::MovUp15).unwrap();
+        process.execute_op(&Operation::MovUp15).unwrap();
         let expected = build_expected(&[16, 8, 4, 3, 1, 2, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
         assert_eq!(expected, process.stack.trace_state());
 
         // error when not enough items on the stack
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::MovUp15).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::MovUp15).is_err());
 
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::MovUp13).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::MovUp13).is_err());
     }
 
     #[test]
@@ -519,32 +519,32 @@ mod tests {
         );
 
         // movdn2
-        process.execute_op(Operation::MovDn2).unwrap();
+        process.execute_op(&Operation::MovDn2).unwrap();
         let expected = build_expected(&[2, 3, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movdn3
-        process.execute_op(Operation::MovDn3).unwrap();
+        process.execute_op(&Operation::MovDn3).unwrap();
         let expected = build_expected(&[3, 1, 4, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movdn7
-        process.execute_op(Operation::MovDn7).unwrap();
+        process.execute_op(&Operation::MovDn7).unwrap();
         let expected = build_expected(&[1, 4, 2, 5, 6, 7, 8, 3, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(expected, process.stack.trace_state());
 
         // movdn15
-        process.execute_op(Operation::MovDn15).unwrap();
+        process.execute_op(&Operation::MovDn15).unwrap();
         let expected = build_expected(&[4, 2, 5, 6, 7, 8, 3, 9, 10, 11, 12, 13, 14, 15, 16, 1]);
         assert_eq!(expected, process.stack.trace_state());
 
         // error when not enough items on the stack
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::MovDn15).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::MovDn15).is_err());
 
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        assert!(process.execute_op(Operation::MovDn13).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        assert!(process.execute_op(&Operation::MovDn13).is_err());
     }
 
     #[test]
@@ -554,23 +554,23 @@ mod tests {
         init_stack_with(&mut process, &[4, 3, 2, 1, 0]);
 
         // no swap (top of the stack is 0)
-        process.execute_op(Operation::CSwap).unwrap();
+        process.execute_op(&Operation::CSwap).unwrap();
         let expected = build_expected(&[1, 2, 3, 4]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swap (top of the stack is 1)
-        process.execute_op(Operation::CSwap).unwrap();
+        process.execute_op(&Operation::CSwap).unwrap();
         let expected = build_expected(&[3, 2, 4]);
         assert_eq!(expected, process.stack.trace_state());
 
         // error: top of the stack is not binary
-        assert!(process.execute_op(Operation::CSwap).is_err());
+        assert!(process.execute_op(&Operation::CSwap).is_err());
 
         // error: not enough values on the stack
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        assert!(process.execute_op(Operation::CSwap).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        assert!(process.execute_op(&Operation::CSwap).is_err());
     }
 
     #[test]
@@ -580,24 +580,24 @@ mod tests {
         init_stack_with(&mut process, &[11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
 
         // no swap (top of the stack is 0)
-        process.execute_op(Operation::CSwapW).unwrap();
+        process.execute_op(&Operation::CSwapW).unwrap();
         let expected = build_expected(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
         assert_eq!(expected, process.stack.trace_state());
 
         // swap (top of the stack is 1)
-        process.execute_op(Operation::CSwapW).unwrap();
+        process.execute_op(&Operation::CSwapW).unwrap();
         let expected = build_expected(&[6, 7, 8, 9, 2, 3, 4, 5, 10, 11]);
         assert_eq!(expected, process.stack.trace_state());
 
         // error: top of the stack is not binary
-        assert!(process.execute_op(Operation::CSwapW).is_err());
+        assert!(process.execute_op(&Operation::CSwapW).is_err());
 
         // error: not enough values on the stack
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Drop).unwrap();
-        process.execute_op(Operation::Pad).unwrap();
-        assert!(process.execute_op(Operation::CSwapW).is_err());
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Drop).unwrap();
+        process.execute_op(&Operation::Pad).unwrap();
+        assert!(process.execute_op(&Operation::CSwapW).is_err());
     }
 
     // HELPER FUNCTIONS

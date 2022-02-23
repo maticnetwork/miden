@@ -38,7 +38,7 @@ impl Decoder {
 
     pub fn respan(&mut self, _op_batch: &OpBatch) {}
 
-    pub fn execute_user_op(&mut self, _op: Operation) {}
+    pub fn execute_user_op(&mut self, _op: &Operation) {}
 
     pub fn end_span(&mut self, _block: &Span) {}
 }

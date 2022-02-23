@@ -30,6 +30,7 @@ impl ExecutionTrace {
             bitwise,
             memory,
             advice: _,
+            proc_stack: _,
         } = process;
 
         // get the length required to hold all execution trace steps
