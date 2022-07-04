@@ -152,7 +152,7 @@
 <h2 id="program-execution"><a class="header" href="#program-execution">Program execution</a></h2>
 <p>Miden VM programs consist of a set of code blocks organized into a binary tree. The leaves of the tree contain linear sequences of instructions, and control flow is defined by the internal nodes of the tree.</p>
 <p>Managing control flow in the VM is accomplished by executing control flow operations listed in the table below. Each of these operations require exactly one VM cycle to execute.</p>
-<table><thead><tr><th>Operation</th><th>Description</th></tr></thead><tbody>
+<div class="table-wrapper"><table><thead><tr><th>Operation</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>JOIN</code></td><td>Initiates processing of a new <a href="../programs.html#join-block">Join block</a>.</td></tr>
 <tr><td><code>SPLIT</code></td><td>Initiates processing of a new <a href="../programs.html#split-block">Split block</a>.</td></tr>
 <tr><td><code>LOOP</code></td><td>Initiates processing of a new <a href="../programs.html#loop-block">Loop block</a>.</td></tr>
@@ -162,6 +162,7 @@
 <tr><td><code>END</code></td><td>Marks the end of a program block.</td></tr>
 <tr><td><code>HALT</code></td><td>Marks the end of the entire program.</td></tr>
 </tbody></table>
+</div>
 <p>Let's consider a simple program below:</p>
 <pre><code>begin
     &lt;operations1&gt;
