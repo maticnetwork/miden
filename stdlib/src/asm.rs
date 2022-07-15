@@ -9905,13 +9905,11 @@ end"),
 # Asserts that both values at the top of the stack are u64 values.
 # The input values are assumed to be represented using 32 bit limbs, fails if they are not.
 proc.u32assert4
-    u32assert
+    u32assert.2
     movup.3
-    u32assert
     movup.3
-    u32assert
+    u32assert.2
     movup.3
-    u32assert
     movup.3
 end
 
@@ -9944,8 +9942,14 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c_hi, c_lo, ...], where c = (a + b) % 2^64
 export.checked_add
-    exec.u32assert4
-    exec.overflowing_add
+    swap
+    movup.3
+    u32assert.2
+    u32add.unsafe
+    movup.3
+    movup.3
+    u32assert.2
+    u32add3.unsafe
     eq.0
     assert
 end
@@ -9974,12 +9978,13 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c_hi, c_lo, ...], where c = (a - b) % 2^64
 export.checked_sub
-    exec.u32assert4
     movup.3
     movup.2
+    u32assert.2
     u32sub.unsafe
     movup.3
     movup.3
+    u32assert.2
     u32sub.unsafe
     eq.0
     assert
@@ -10058,8 +10063,29 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c_hi, c_lo, ...], where c = (a * b) % 2^64
 export.checked_mul
-    exec.u32assert4
-    exec.overflowing_mul
+    dup.3
+    dup.2
+    u32assert.2
+    u32mul.unsafe
+    dup.4
+    dup.3
+    u32assert.2
+    drop
+    movup.4
+    u32madd.unsafe
+    swap
+    movup.5
+    dup.4
+    u32madd.unsafe
+    movup.5
+    movup.5
+    u32assert.2
+    u32madd.unsafe
+    movup.3
+    movup.2
+    u32add.unsafe
+    movup.2
+    add
     u32or
     eq.0
     assert
@@ -10090,8 +10116,19 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a < b, and 0 otherwise.
 export.checked_lt
-    exec.u32assert4
-    exec.unchecked_lt
+    movup.3
+    movup.2
+    u32assert.2
+    u32sub.unsafe
+    movdn.3
+    drop
+    u32assert.2
+    u32sub.unsafe
+    swap
+    eq.0
+    movup.2
+    and
+    or
 end
 
 # Performs greater-than comparison of two unsigned 64 bit integers.
@@ -10118,8 +10155,19 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a > b, and 0 otherwise.
 export.checked_gt
-    exec.u32assert4
-    exec.unchecked_gt
+    movup.2
+    u32assert.2
+    u32sub.unsafe
+    movup.2
+    movup.3
+    u32assert.2
+    u32sub.unsafe
+    swap
+    drop
+    movup.2
+    eq.0
+    and
+    or
 end
 
 # Performs less-than-or-equal comparison of two unsigned 64 bit integers.
@@ -10136,8 +10184,7 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a <= b, and 0 otherwise.
 export.checked_lte
-    exec.u32assert4
-    exec.unchecked_gt
+    exec.checked_gt
     not
 end
 
@@ -10155,8 +10202,7 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a >= b, and 0 otherwise.
 export.checked_gte
-    exec.u32assert4
-    exec.unchecked_lt
+    exec.checked_lt
     not
 end
 
@@ -10178,8 +10224,14 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a == b, and 0 otherwise.
 export.checked_eq
-    exec.u32assert4
-    exec.unchecked_eq
+    movup.2
+    u32assert.2
+    u32eq
+    swap
+    movup.2
+    u32assert.2
+    u32eq
+    and
 end
 
 # Performs inequality comparison of two unsigned 64 bit integers.
@@ -10200,8 +10252,8 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c, ...], where c = 1 when a == b, and 0 otherwise.
 export.checked_neq
-    exec.u32assert4
-    exec.unchecked_eq
+    exec.checked_eq
+    not
 end
 
 # Performs comparison to zero of an unsigned 64 bit integer.
@@ -10220,10 +10272,7 @@ end
 # Stack transition looks as follows:
 # [a_hi, a_lo, ...] -> [c, ...], where c = 1 when a == 0, and 0 otherwise.
 export.checked_eqz
-    u32assert
-    swap
-    u32assert
-    swap
+    u32assert.2
     eq.0
     swap
     eq.0
@@ -10344,8 +10393,55 @@ end
 # Stack transition looks as follows:
 # [b_hi, b_lo, a_hi, a_lo, ...] -> [c_hi, c_lo, ...], where c = a // b
 export.checked_div
-    exec.u32assert4
-    exec.unchecked_div
+    adv.u64div          # inject the quotient and the remainder into the advice tape
+
+    push.adv.1
+    push.adv.1
+    u32assert.2
+
+    dup.3               # multiply quotient by the divisor and make sure the resulting value
+    dup.2               # fits into 2 32-bit limbs
+    u32mul.unsafe
+    dup.4
+    dup.4
+    u32madd.unsafe
+    eq.0
+    assert
+    dup.5
+    dup.3
+    u32madd.unsafe
+    eq.0
+    assert
+    dup.4
+    dup.3
+    mul
+    eq.0
+    assert
+
+    push.adv.1
+    push.adv.1
+    u32assert.2
+
+    movup.7             # make sure the divisor is greater than the remainder. this also consumes
+    movup.7             # the divisor
+    dup.3
+    dup.3
+    exec.unchecked_gt
+    assert
+
+    swap                # add remainder to the previous result; this also consumes the remainder
+    movup.3
+    u32add.unsafe
+    movup.3
+    movup.3
+    u32add3.unsafe
+    eq.0
+    assert
+
+    movup.4             # make sure the result we got is equal to the dividend
+    assert.eq
+    movup.3
+    assert.eq           # quotient remains on the stack
 end
 
 # ===== MODULO OPERATION ==========================================================================
