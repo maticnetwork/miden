@@ -334,14 +334,14 @@
 <h2 id="code-organization"><a class="header" href="#code-organization">Code organization</a></h2>
 <p>A Miden assembly program is just a sequence of instructions each describing a specific directive or an operation. You can use any combination of whitespace characters to separate one instruction from another.</p>
 <p>In turn, Miden assembly instructions are just keywords which can be parameterized by zero or more parameters. The notation for specifying parameters is <em>keyword.param1.param2</em> - i.e., the parameters are separated by periods. For example, <code>push.123</code> instruction denotes a <code>push</code> operation which is parameterized by value <code>123</code>.</p>
-<p>Currently, Miden assembly provides two types of code organization blocks: <em>scripts</em> and <em>procedures</em>. In the future, additional blocks such as modules and functions will be added.</p>
-<h3 id="scripts"><a class="header" href="#scripts">Scripts</a></h3>
-<p>A <em>script</em> block is used to define an executable program. A script must start with a <code>begin</code> instruction and terminate with an <code>end</code> instruction. For example:</p>
+<p>Currently, Miden assembly provides two types of code organization blocks: <em>programs</em> and <em>procedures</em>. In the future, additional blocks such as modules and functions will be added.</p>
+<h3 id="programs"><a class="header" href="#programs">Programs</a></h3>
+<p>A <em>program</em> block is used to define an executable program. A program must start with a <code>begin</code> instruction and terminate with an <code>end</code> instruction. For example:</p>
 <pre><code>begin
     &lt;instructions&gt;
 end
 </code></pre>
-<p>When Miden assembly code is executed, the execution starts at the first instruction following the <code>begin</code> instruction of the script. A script block is expected to be the last block in a program and can be followed only by comment blocks.</p>
+<p>When Miden assembly code is executed, the execution starts at the first instruction following the <code>begin</code> instruction of the program. A program block is expected to be the last block in an assembly file and can be followed only by comment blocks.</p>
 <h3 id="procedures"><a class="header" href="#procedures">Procedures</a></h3>
 <p>A <em>procedure</em> block is used to define a frequently-used sequence of instructions. A procedure must start with a <code>proc.&lt;label&gt;.&lt;number of locals&gt;</code> instruction and terminate with an <code>end</code> instruction. For example:</p>
 <pre><code>proc.foo.2
@@ -354,7 +354,7 @@ end
 <pre><code>exec.foo
 </code></pre>
 <p>During compilation, procedures are inlined at their call sites. Thus, from the standpoint of the final program, executing procedures is indistinguishable from manually including procedure code in place of the <code>exec</code> instruction.</p>
-<p>A procedure may execute any other previously defined procedure from the same source, but it cannot execute itself or any of the subsequent procedures. Thus, recursive procedure calls are not possible. For example, the following code block defines a script with two procedures:</p>
+<p>A procedure may execute any other previously defined procedure from the same source, but it cannot execute itself or any of the subsequent procedures. Thus, recursive procedure calls are not possible. For example, the following code block defines a program with two procedures:</p>
 <pre><code>proc.foo
     &lt;instructions&gt;
 end
@@ -372,7 +372,7 @@ begin
     exec.foo
 end
 </code></pre>
-<p>In addition to local procedures defined within a script, Miden assembly programs can invoke procedures defined in the standard library as described <a href="user_docs/assembly/../stdlib/main.html">here</a>.</p>
+<p>In addition to local procedures defined within a program, Miden assembly programs can invoke procedures defined in the standard library as described <a href="user_docs/assembly/../stdlib/main.html">here</a>.</p>
 <h3 id="comments"><a class="header" href="#comments">Comments</a></h3>
 <p>Miden assembly allows annotating code with simple comments. Currently, the only supported type of comments is a single-line comment which starts with a <code>#</code> (pound) character. For example:</p>
 <pre><code># this is a comment
