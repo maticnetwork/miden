@@ -97,6 +97,18 @@ pub enum Operation {
     /// equal, pushes 1 onto the stack, otherwise pushes 0 onto the stack.
     Eqw,
 
+    /// Computes a single turn of binary accumulation for the given inputs. This operation can be
+    /// be used to compute a single turn of power of 2.
+    ///
+    /// The stack is expected to be arranged as follows (from the top):
+    /// - exponent of 2 for this turn - 1 element
+    /// - accumulated power of 2 so far - 1 element
+    /// - number which needs to be shifted to the right - 1 element
+    ///
+    /// At the end of the operation, exponent is replaced with its square, current value of power of 2
+    /// on exponent is incorported into the accumulator and the number is shifted to the right by one bit.
+    BinAcc,
+
     // ----- u32 operations -----------------------------------------------------------------------
     /// Pops an element off the stack, splits it into upper and lower 32-bit values, and pushes
     /// these values back onto the stack.
@@ -387,36 +399,37 @@ impl Operation {
             Self::And => 0b0100_1011,
             Self::Or => 0b0100_1100,
             Self::Not => 11,
+            Self::BinAcc => 12,
 
-            Self::Pad => 12,
-            Self::Drop => 13,
+            Self::Pad => 13,
+            Self::Drop => 14,
 
-            Self::Dup0 => 14,
-            Self::Dup1 => 15,
-            Self::Dup2 => 16,
-            Self::Dup3 => 17,
-            Self::Dup4 => 18,
-            Self::Dup5 => 19,
-            Self::Dup6 => 20,
-            Self::Dup7 => 21,
-            Self::Dup9 => 22,
-            Self::Dup11 => 23,
-            Self::Dup13 => 24,
-            Self::Dup15 => 25,
+            Self::Dup0 => 15,
+            Self::Dup1 => 16,
+            Self::Dup2 => 17,
+            Self::Dup3 => 18,
+            Self::Dup4 => 19,
+            Self::Dup5 => 20,
+            Self::Dup6 => 21,
+            Self::Dup7 => 22,
+            Self::Dup9 => 23,
+            Self::Dup11 => 24,
+            Self::Dup13 => 25,
+            Self::Dup15 => 26,
 
-            Self::Swap => 26,
-            Self::SwapW => 27,
-            Self::SwapW2 => 28,
-            Self::SwapW3 => 29,
-            Self::SwapDW => 30,
+            Self::Swap => 27,
+            Self::SwapW => 28,
+            Self::SwapW2 => 29,
+            Self::SwapW3 => 30,
+            Self::SwapDW => 31,
 
-            Self::MovUp2 => 31,
-            Self::MovUp3 => 32,
-            Self::MovUp4 => 33,
-            Self::MovUp5 => 34,
-            Self::MovUp6 => 35,
-            Self::MovUp7 => 36,
-            Self::MovUp8 => 37,
+            Self::MovUp2 => 32,
+            Self::MovUp3 => 33,
+            Self::MovUp4 => 34,
+            Self::MovUp5 => 35,
+            Self::MovUp6 => 36,
+            Self::MovUp7 => 37,
+            Self::MovUp8 => 38,
 
             Self::MovDn2 => 40,
             Self::MovDn3 => 41,
@@ -525,6 +538,7 @@ impl fmt::Display for Operation {
             Self::Eq => write!(f, "eq"),
             Self::Eqz => write!(f, "eqz"),
             Self::Eqw => write!(f, "eqw"),
+            Self::BinAcc => write!(f, "binacc"),
 
             // ----- u32 operations ---------------------------------------------------------------
             Self::U32assert2 => write!(f, "u32assert2"),

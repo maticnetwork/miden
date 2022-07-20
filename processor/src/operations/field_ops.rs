@@ -1,3 +1,5 @@
+use vm_core::StarkField;
+
 use super::{utils::assert_binary, ExecutionError, Felt, FieldElement, Process};
 
 // FIELD OPERATIONS
@@ -159,6 +161,57 @@ impl Process {
             self.stack.set(0, Felt::ZERO);
         }
         self.stack.shift_right(0);
+        Ok(())
+    }
+
+    /// Computes a single turn of binary accumulation for the given inputs. The stack is arranged
+    /// as follows (from the top):
+    /// - exponent of 2 for this turn - 1 element
+    /// - accumulated power of 2 so far - 1 element
+    /// - number which needs to be shifted to the right - 1 element
+    ///
+    /// To perform the operation we do the following:
+    /// 1. Pops top three elements off the stack and calculate the least significant bit of the
+    /// number `b`.
+    /// 2. Use this bit to decide if the current 2 raise to the power exponent needs to be included
+    /// in the accumulator.
+    /// 3. Update exponent with its square and the number b with one right shift.
+    /// 4. Pushes the calcuted new values to the stack in the mentioned order.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Exponent is not a power of 2.
+    /// - Accumulator is not a power of 2.
+    pub(super) fn op_binacc(&mut self) -> Result<(), ExecutionError> {
+        let mut exp = self.stack.get(0);
+        let mut acc = self.stack.get(1);
+        let mut b = self.stack.get(2);
+
+        // Both exp and acc should be a power of 2. Infact log of exp should also be a power
+        // of 2 as well.
+        if !exp.as_int().is_power_of_two() {
+            return Err(ExecutionError::InvalidPowerOfTwo(exp));
+        }
+        if !acc.as_int().is_power_of_two() {
+            return Err(ExecutionError::InvalidPowerOfTwo(exp));
+        }
+
+        // least significant bit of the number `b`.
+        let bit = b.as_int() & 1;
+
+        // current value of 2 raise to the power `exponent` added to the accumulator.
+        acc *= Felt::new((exp.as_int() - 1) * bit + 1);
+
+        // number `b` shifted right by one bit.
+        b = Felt::new(b.as_int() >> 1);
+
+        // exponent updated with its square.
+        exp *= exp;
+
+        self.stack.set(0, exp);
+        self.stack.set(1, acc);
+        self.stack.set(2, b);
+        self.stack.copy_state(3);
         Ok(())
     }
 }
@@ -460,6 +513,70 @@ mod tests {
         values.insert(0, 0);
         let expected = build_expected_from_ints(&values);
         assert_eq!(expected, process.stack.trace_state());
+    }
+
+    #[test]
+    fn op_binacc() {
+        // --- test when b become 0 -------------------------------------------------------------------------------
+        let mut process = Process::new_dummy();
+        let a = 0;
+        let b = 32;
+        let c = 4;
+        init_stack_with(&mut process, &[a, b, c]);
+
+        process.execute_op(Operation::BinAcc).unwrap();
+        let expected = build_expected(&[Felt::new(16), Felt::new(32), Felt::new(a >> 1)]);
+        assert_eq!(expected, process.stack.trace_state());
+
+        // --- test when bit from b is 1 ---------------------------------------------------------------------------
+        let mut process = Process::new_dummy();
+        let a = 3;
+        let b = 1;
+        let c = 16;
+        init_stack_with(&mut process, &[a, b, c]);
+
+        process.execute_op(Operation::BinAcc).unwrap();
+        let expected = build_expected(&[Felt::new(256), Felt::new(16), Felt::new(a >> 1)]);
+        assert_eq!(expected, process.stack.trace_state());
+
+        // --- test when bit from b is 1 & exp is 2**32. exp will overflow the field after this operation -----------
+        let mut process = Process::new_dummy();
+        let a = 1;
+        let b = 16;
+        let c = 2u64.pow(32);
+        init_stack_with(&mut process, &[a, b, c]);
+
+        process.execute_op(Operation::BinAcc).unwrap();
+        let expected = build_expected(&[
+            Felt::new(2u64.pow(32)) * Felt::new(2u64.pow(32)),
+            Felt::new(2u64.pow(36)),
+            Felt::new(a >> 1),
+        ]);
+        assert_eq!(expected, process.stack.trace_state());
+
+        // --- test fails, exp not pow of 2 ----------------------------------------------------------------------------
+        let mut process = Process::new_dummy();
+        let a = 3;
+        let b = 1;
+        let c = 15;
+        init_stack_with(&mut process, &[a, b, c]);
+        assert!(process.execute_op(Operation::BinAcc).is_err());
+
+        // --- test fails, acc not pow of 2 ----------------------------------------------------------------------------
+        let mut process = Process::new_dummy();
+        let a = 2;
+        let b = 45;
+        let c = 4;
+        init_stack_with(&mut process, &[a, b, c]);
+        assert!(process.execute_op(Operation::BinAcc).is_err());
+
+        // --- test fails, both acc & exp not pow of 2 ------------------------------------------------------------------
+        let mut process = Process::new_dummy();
+        let a = 2;
+        let b = 47;
+        let c = 5;
+        init_stack_with(&mut process, &[a, b, c]);
+        assert!(process.execute_op(Operation::BinAcc).is_err());
     }
 
     // HELPER FUNCTIONS

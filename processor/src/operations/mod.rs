@@ -48,6 +48,7 @@ impl Process {
             Operation::Eq => self.op_eq()?,
             Operation::Eqz => self.op_eqz()?,
             Operation::Eqw => self.op_eqw()?,
+            Operation::BinAcc => self.op_binacc()?,
 
             // ----- u32 operations ---------------------------------------------------------------
             Operation::U32split => self.op_u32split()?,
