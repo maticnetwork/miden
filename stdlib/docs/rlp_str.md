@@ -1,0 +1,4 @@
+## std::str::rlp
+| Procedure | Description |
+| ----------- | ------------- |
+| rlp_decode.2 | This is used for 5 field-elements -> 4 field-elements RLP converting. Used to decode a RLP code which contains up to 34 chars, the decoding result is ASCII in the form of WORD <br /> <br /> Input: [a, b_0, b_1, b_2, b_3, b_4] <br /> a: `a_hi` -- whether the decoding result will be put into memory;<br />a: `a_lo` -- only if `a_hi` is '1', this is the memory address to put the decoding result in  <br />  b_0 to b_4 : are the RLP code.<br /><br />Output: a, b, (C)<br /> a: the number of chars in the RLP Code <br />   b: `b_hi` -- whether the decoding result will be put into memory;<br />b: `b_lo` -- only if `b_hi` is '1', this is the memory address to put the decoding result in  <br />  C: the decoding result if not stored into memory. If the decoding result is stored into memory, C doesn't exist on stack. |

@@ -46,6 +46,7 @@ structopt = { version = "0.3", default-features = false, optional = true }
 verifier = { package = "miden-verifier", path = "../verifier", version = "0.2", default-features = false }
 winter-utils = { package = "winter-utils", version = "0.4", optional = true }
 vm-core = { package = "miden-core", path = "../core", version = "0.2", default-features = false }
+rlp = "0.5.1"
 
 [dev-dependencies]
 blake3 = "1.3.1"

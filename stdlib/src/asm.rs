@@ -4,7 +4,7 @@
 ///
 /// Entries in the array are tuples containing module namespace and module source code.
 #[rustfmt::skip]
-pub const MODULES: [(&str, &str); 6] = [
+pub const MODULES: [(&str, &str); 7] = [
 // ----- std::crypto::hashes::blake3 --------------------------------------------------------------
 ("std::crypto::hashes::blake3", "# Initializes four memory addresses, provided for storing initial 4x4 blake3 
 # state matrix ( i.e. 16 elements each of 32 -bit ), for computing blake3 2-to-1 hash
@@ -8869,6 +8869,135 @@ export.unchecked_rotr
     cswap
 end
 "),
+// ----- std::str::rlp ----------------------------------------------------------------------------
+("std::str::rlp", "# Total Number of VM Cycles: 638 #
+# This is used for 5 field-elements -> 4 field-elements RLP converting. #
+# Used to decode a RLP code which contains up to 34 chars, the decoding result is ASCII #
+# input: [a, b_0, b_1, b_2, b_3, b_4] #
+#   a: a_hi -- whether the decoding result will be put into memory #
+#      a_lo -- only if a_hi is '1', this is the memory address to put the decoding result in  #
+#   b_0 to b_4 are the RLP code #
+# output: a, b, (C)
+#   a: the number of chars in the RLP Code #
+#   b: b_hi -- whether the decoding result will be put into memory #
+#      b_lo -- only if b_hi is '1', this is the memory address to put the decoding result in  #
+#   C: the decoding result if not stored into memory. If the decoding result is stored into memory, C doesn't exist on stack. #
+
+export.rlp_decode.2
+    push.adv.1
+    pop.local.1                                                     #pop the first one into local[1]# 
+    # handle the first field element of RLP Code, which is unique to 2-5 field element.#
+    push.adv.1
+    u32split
+    swap
+    dup.0 push.255 u32and 
+    dup.0 push.162 lte assert                                       #make sure the string length is less than(or equal to) 34, otherwise error #
+    u32checked_sub.128 pop.local.0 u32shr.8                                    #local[0] should hold the first R-bytes, which represent the length of this string#
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the actuall 1st R-bytes, we need to make sure each char can be represent as ASCII#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the actuall 2nd R-bytes#
+    u32shr.8
+    movup.3
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the actuall 3rd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the actuall 4th R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the actuall 5rd R-bytes#
+    u32shr.8                                                        #the actuall 6rd R-bytes#
+    drop                                                            #the leading 0 should be discarded. #
+    dup.0 push.128 u32and not assert
+
+    # read the 2nd field element #
+    push.adv.1 u32split swap
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the 1nd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the 2nd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap     #the 3nd R-bytes, now 9 ASCII have been read, we need to do one compression #
+
+    movdn.10 movup.3 movdn.10
+    repeat.8
+        mul.128 add
+    end
+    movdn.2 u32shr.8                                                    #the 4th R-bytes#
+    dup.0 push.128 u32and not assert
+    swap dup.0 dup.0 push.128 u32and not assert push.255 u32and swap    #the 5th R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 6th R-bytes#
+    u32shr.8                                                            #the 7th R-bytes#
+    dup.0 push.128 u32and not assert
+
+    # read the 3rd field element #
+    push.adv.1 u32split swap
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 1st R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 2rd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 3rd R-bytes#
+    u32shr.8                                                            #the 4th R-bytes#
+    dup.0 push.128 u32and not assert
+
+    movup.4
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 5th R-bytes,now 9 ASCII have been read, we need to do one compression #
+    movdn.10 
+    repeat.8
+         mul.128 add
+    end
+    swap movup.2
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 6th R-bytes#
+    u32shr.8                                                            #the 7th R-bytes#
+    dup.0 push.128 u32and not assert
+
+    # read the 4th field element #
+    push.adv.1 u32split swap
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 1st R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 2rd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 3rd R-bytes#
+    u32shr.8                                                            #the 4th R-bytes#
+    dup.0 push.128 u32and not assert
+    movup.4
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 5th R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap         #the 6th R-bytes#
+    u32shr.8                                                            #the 7th R-bytes, do one compression#
+    dup.0 push.128 u32and not assert 
+    repeat.8
+        mul.128 add 
+    end
+    movdn.2
+
+    # read the 5th field element #
+    push.adv.1 u32split swap
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap        #the 1st R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap        #the 2rd R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap        #the 3rd R-bytes#
+    u32shr.8                                                           #the 4th R-bytes#
+    dup.0 push.128 u32and not assert
+    movup.4
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap        #the 5th R-bytes#
+    u32shr.8
+    dup.0 dup.0 push.128 u32and not assert push.255 u32and swap        #the 6th R-bytes#
+    u32shr.8                                                           #the 7th R-bytes#
+    dup.0 push.128 u32and not assert
+    push.0.0                                                           #add leading 0s make 9 items, do one compression #
+    repeat.8
+        mul.128 add
+    end
+    movdn.3 push.local.1 dup.0 movdn.5
+    u32split
+    if.true
+        popw.mem
+    else
+        drop
+        movup.4
+    end
+    push.local.0
+end"),
 // ----- std::sys ---------------------------------------------------------------------------------
 ("std::sys", "# Removes elements deep in the stack until the depth of the stack is exactly 16. The elements
 # are removed in such a way that the top 16 elements of the stack remain unchanged.
