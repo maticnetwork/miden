@@ -1,214 +1,191 @@
-# I/O Operations
-In this section we describe the AIR constraint for Miden VM I/O operations.
+# Input / output operations
+In this section we describe the AIR constraint for Miden VM input / output operations. These operations move values between the stack and other components of the VM such as program code (i.e., decoder), memory, and advice provider.
 
 ### PUSH
+The `PUSH` operation pushes the provided immediate value onto the stack (i.e., sets the value of $s_0$ register). Currently, it is the only operation in Miden VM which carries an immediate value. The semantics of this operation are explained in the [decoder section](../decoder/main.html#handling-immediate-values).
 
-`PUSH` operation pushes the provided immediate value onto the stack. Currently, it is the only such operation in Miden VM which accepts an immediate value. The operation has been explained in detail [here](https://maticnetwork.github.io/miden/design/decoder/main.html#handling-immediate-values).
-
-The `PUSH` operation will shift the stack to the right by one.
+The effect of this operation on the rest of the stack is:
+* **Right shift** starting from position $0$.
 
 ### SDEPTH
-
-`SDEPTH` pushes the current depth of the stack prior to the execution of this operation onto the stack. The diagram below illustrates this graphically.
+The `SDEPTH` pushes the current depth of the stack (prior to the execution of this operation) onto the stack. The diagram below illustrates this graphically.
 
 ![sdepth](../../assets/design/stack/io_operations/SDEPTH.png)
 
-The stack transition for this operation must follow the following constraint:
+Stack transition for this operation must satisfy the following constraints:
 
-> $$
-s_0' - b_0 = 0 \text{ | degree } = 1\\
-b_0' - b_0 = 1 \text{ | degree } = 1
+>$$
+s_0' - b_0 = 0 \text{ | degree } = 1
 $$
 
-where $b_0$ is the stack depth prior to the execution of this operation. 
+where $b_0$ is the stack bookkeeping register which keeps track of the current stack depth as described [here](./main.md#stack-representation).
 
-The `SDEPTH` operation will shift the stack to the right by one. The maximum degree of the above operation is $1$.
+The effect of this operation on the rest of the stack is:
+* **Right shift** starting from position $0$.
 
 ### READ
-
-`READ` operation removes the next element from the advice tape and pushes it onto the stack. The diagram below illustrates this graphically.
+The `READ` operation removes the next element from the advice tape and pushes it onto the stack. The diagram below illustrates this graphically.
 
 ![read](../../assets/design/stack/io_operations/READ.png)
 
-The stack transition for this operation must follow the following constraint:
+The `READ` operation does not impose any constraints against the first element of the stack.
 
-> $$
-s_i' - s_{i-1} = 0 \space where \space i \in \{1..15\} \text{ | degree } = 1
-$$
-
-The `READ` operation will shift the stack to the right by one. The maximum degree of the above operation is $1$.
+The effect of this operation on the rest of the stack is:
+* **Right shift** starting from position $0$.
 
 ### READW
-
-`READW` operation removes a word (4 consecutive field elements) from the advice tape and pushes it onto the stack by overwriting the existing elements present in the stack. The diagram below illustrates this graphically.
+The `READW` operation removes a word (4 field elements) from the advice tape and puts it onto the stack by overwriting the top $4$ elements of the stack. The diagram below illustrates this graphically.
 
 ![readw](../../assets/design/stack/io_operations/READW.png)
 
-The stack transition for this operation must follow the following constraint:
+The `READW` operation does not impose any constraints against the top $4$ elements of the stack.
 
-> $$
-s_i' - s_{i-4} = 0 \space where \space i \in \{4..15\} \text{ | degree } = 1
+The effect of this operation on the rest of the stack is:
+* **No change** starting from position $4$.
+
+## Memory access operations
+Miden VM exposes several operations for reading from and writing to random access memory. Memory in Miden VM is managed by the [Memory chiplet](../chiplets/memory.md).
+
+Communication between the stack and the memory chiplet is accomplished via the chiplet bus $b_{chip}$. To make requests to the chiplet bus we need to divide its current value by the value representing memory access request. The structure of memory access request value is described [here](../chiplets/memory.md#memory-row-value).
+
+To enforce the correctness of memory access, we can use the following constraint:
+
+>$$
+b_{chip}' \cdot u_{mem} = b_{chip} \text{ | degree } = 2
 $$
 
-The `READW` operation will not change the depth of the stack i.e. the stack doesn't shift while transitioning. The maximum degree of the above operation is $1$.
-
-### MLOAD
-
-`MLOAD` operation loads the first element from the specified memory address onto the stack. The top element in the stack before the execution of this operation is the memory address which is been used to fetch a word(4 consecutive field elements) from the memory and then the *first* element of this word is pushed to the top of the stack. The diagram below illustrates this graphically.
-
-![mload](../../assets/design/stack/io_operations/MLOAD.png)
-
-To facilitate this operation, we will need to perform a lookup into the memory table at the specified address using the current values of context and clock cycle registers as described [here](https://maticnetwork.github.io/miden/design/chiplets/memory.html). 
-
-Let's define a few intermediate variables to simplify constraint description:
-
-$$
-v_h = \alpha_0 + \alpha_1 \cdot 8 + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk1
-$$
-
-$$
-v_{n} = \alpha_4 \cdot s_0' + \sum_{i=0}^2\alpha_{i+5} \cdot m_i
-$$
-
-$$
-v_{o} = \alpha_8 \cdot s_0' + \sum_{i=0}^2\alpha_{i+9} \cdot m_i
-$$
-
-In the above:
-- $v_h$ is a _common header_ which is a combination of unique identifier, memory address and clock cycle. The $8$ in the permutation check is the unique identifier of `MEMORY` operation which has been explained [here](../chiplets/main.md#operation-labels).
-- $clk1$ is the clock cycle and $\alpha_0$, $\alpha_1$, $\alpha_2$ etc... are random values sent from the verifier to the prover for use in permutation checks.
-- Values for the helper registers $m_0, m_1,  m_2$ are provided by the VM non-deterministically and represent last 3 elements of the old memory at specified address.
-- $v_{n}$ and $v_{o}$ can be thought of as component of new and old memory value (whole word) in the permutation check calculation. 
-
-The lookup in the table can be accomplished by including the value into the lookup product such that it follows the following constraint:
-
-> $$
-b_{aux}' \cdot \left(v_h + v_{n} + v_{o}\right) = b_{aux} \text{ | degree } = 2
-$$
-
-where $b_{aux}$ is the running product column of auxiliary table. We are not including context in the permutation check as its not yet been implemented. We plan to add context to the memory in $v3.0$.
-
-Although we are only updating one element in the memory we need to include the rest of all elements in the permutation check as the overall memory value(we can loosely relate to a hash of memory elements though it is not appropriate) has changed. Also, note that the value from the top of the stack and helper registers are added twice to the permutation check: once for the old values and the other one for new values. We can do this because old and new values in the memory table row corresponding to the load operation are the same.
-
-The `MLOAD` operation will not change the depth of the stack i.e. the stack doesn't shift while transitioning. The maximum degree of the above operation is $2$.
+In the above, $u_{mem}$ is the value of memory access request. Thus, to describe AIR constraint for memory operations, it is sufficient to describe how $u_{mem}$ is computed. We do this in the following sections.
 
 ### MLOADW
-
-`MLOADW` operation loads a word(4 consecutive field elements) from the specified memory address onto the stack. The top element in the stack before the execution of this operation is the memory address which is been used to fetch a word and then the top four elements of the stack are overwritten with values retrieved from the memory. The diagram below illustrates this graphically.
+The `MLOADW` operation loads a word (4 field elements) from the specified memory address onto the stack. The address is specified by the top stack element. After the operation is executed, the top $4$ stack elements are overwritten with values retrieved from the memory. The diagram below illustrates this graphically.
 
 ![mloadw](../../assets/design/stack/io_operations/MLOADW.png)
 
-To facilitate this operation, we will need to perform a lookup into the memory table at the specified address using the current values of context and clock cycle registers described [here](https://maticnetwork.github.io/miden/design/chiplets/memory.html). 
+To simplify description of memory access request value, we first define the following variables:
 
-Let's define a few intermediate variables to simplify constraint description:
-
-$$
-v_h = \alpha_0 + \alpha_1 \cdot 8 + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk1
-$$
+The value representing state of memory before the operation:
 
 $$
-v_{n} = \sum_{i=0}^3\alpha_{i+4} \cdot s_i'
+v_{old} = \sum_{i=0}^3\alpha_{i+4} \cdot s_{3-i}'
 $$
 
-$$
-v_{o} = \sum_{i=0}^3\alpha_{i+8} \cdot s_i'
-$$
-
-In the above:
-- $v_h$ is a _common header_ which is a combination of unique identifier, memory address and clock cycle. The $8$ in the permutation check is the unique identifier of `MEMORY` operation which has been explained [here](../chiplets/main.md#operation-labels).
-- $clk1$ is the clock cycle and $\alpha_0$, $\alpha_1$, $\alpha_2$ etc... are random values sent from the verifier to the prover for use in permutation checks.
-- $v_{n}$ and $v_{o}$ can be thought of as component of new and old memory value (whole word) in the permutation check calculation. 
-
-The lookup in the table can be accomplished by including the value into the lookup product such that it follows the following constraint:
-
-> $$
-b_{aux}' \cdot \left(v_h + v_{n} + v_{o}\right) = b_{aux} \text{ | degree } = 2
-$$
-
-where $b_{aux}$ is the running product column of auxiliary table. We are not including context in the permutation check as its not yet been implemented. We plan to add context to the memory in $v3.0$. 
-
-Also, note that the value from the top of the stack are added twice to the permutation check: once for the old values and the other one for new values. We can do this because old and new values in the memory table row corresponding to the load operation are the same.
-
-The `MLOADW` operation will not change the depth of the stack i.e. the stack doesn't shift while transitioning. The maximum degree of the above operation is $2$.
-
-### MSTORE
-
-`MSTORE` operation stores an element from the stack into the first slot at the specified memory address. The top element in the stack before the execution of this operation is the memory address which is been used to fetch a word and then the top stack element is saved into the first element of the word located at the specified memory address. The remaining three elements of the word were not affected. The diagram below illustrates this graphically.
-
-![mstore](../../assets/design/stack/io_operations/MSTORE.png)
-
-To facilitate this operation, we will need to perform a lookup into the memory table at the specified address using the current values of context and clock cycle registers described [here](https://maticnetwork.github.io/miden/design/chiplets/memory.html). 
-
-Let's define a few intermediate variables to simplify constraint description:
+The value representing state of memory after the operation:
 
 $$
-v_h = \alpha_0 + \alpha_1 \cdot 8 + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk1
+v_{new} = \sum_{i=0}^3\alpha_{i+8} \cdot s_{3-i}'
 $$
 
-$$
-v_{n} = \alpha_4 \cdot s_0' + \sum_{i=1}^3\alpha_{i+4} \cdot m_i
-$$
+Note that since this is a _read_ operation, the values come from the same registers, but the $\alpha$ values are different from the values used to compute the old state of memory.
+
+Using the above variables, we define the value representing the memory access request as follows:
 
 $$
-v_{o} = \sum_{i=0}^3\alpha_{i+8} \cdot m_i
+u_{mem} = \alpha_0 + \alpha_1 \cdot op_{mem} + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk + v_{old} + v_{new}
 $$
 
 In the above:
-- $v_h$ is a _common header_ which is a combination of unique identifier, memory address and clock cycle. The $8$ in the permutation check is the unique identifier of `MEMORY` operation which has been explained [here](../chiplets/main.md#operation-labels).
-- $clk1$ is the clock cycle and $\alpha_0$, $\alpha_1$, $\alpha_2$ etc... are random values sent from the verifier to the prover for use in permutation checks. 
-- Values for the helper registers $m_0, m_1,  m_2, m_3$ are provided by the VM non-deterministically and represent old memory at the specified address.
-- $v_{n}$ and $v_{o}$ can be thought of as component of new and old memory value (whole word) in the permutation check calculation. 
+- $op_{mem}$ is the unique [operation label](../chiplets/main.md#operation-labels) of the memory access operation.
+- $s_0$ is the memory address from which the values are to be loaded onto the stack.
+- $clk$ is the current clock cycle of the VM.
 
-The lookup in the table can be accomplished by including the value into the lookup product such that it follows the following constraint:
+The effect of this operation on the rest of the stack is:
+* **No change** starting from position $4$.
 
-> $$
-s_0' - s_1 = 0 \text{ | degree } = 1\\
-b_{aux}' \cdot \left(v_h + v_{n} + v_{o}\right) = b_{aux} \text{ | degree } = 2
+### MLOAD
+The `MLOAD` operation is similar to the `MLOADW` operation but instead of loading the full word, we load only the first element of the word at the specified address onto the stack. The diagram below illustrates this graphically.
+
+![mload](../../assets/design/stack/io_operations/MLOAD.png)
+
+To simplify description of memory access request value, we first define the following variables:
+
+The value representing state of memory before the operation (values in registers $h_0, h_1, h_2$ are set by the prover nondeterministically):
+
+$$
+v_{old} = \alpha_4 \cdot s_0' + \sum_{i=2}^3\alpha_{i+4} \cdot h_i'
 $$
 
-where $b_{aux}$ is the running product column of auxiliary table. We are not including context in the permutation check as its not yet been implemented. We plan to add context to the memory in $v3.0$. 
+The value representing state of memory after the operation:
 
-Although we are only updating one element in the memory we need to include the rest of all elements in the permutation check as the overall memory value(we can loosely relate to a hash of memory elements though it is not appropriate) has changed. During the lookup we also stored the old memory values in the helper registers. For this instruction, the new memory value will differ from the old value on the *first* element only.
+$$
+v_{new} = \alpha_8 \cdot s_0' + \sum_{i=0}^2\alpha_{i+8} \cdot h_i'
+$$
 
-The `MSTORE` operation will shift the stack to left by one. The maximum degree of the above operation is $2$.
+Using the above variables, we define the value representing the memory access request as follows:
+
+$$
+u_{mem} = \alpha_0 + \alpha_1 \cdot op_{mem} + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk + v_{old} + v_{new}
+$$
+
+In the above:
+- $op_{mem}$ is the unique [operation label](../chiplets/main.md#operation-labels) of the memory access operation.
+- $s_0$ is the memory address from which the value is to be loaded onto the stack.
+- $clk$ is the current clock cycle of the VM.
+
+The effect of this operation on the rest of the stack is:
+* **No change** starting from position $1$.
 
 ### MSTOREW
-
-`MSTOREW` operation stores a word(4 consecutive field elements) from the stack into the specified memory address. The top element in the stack before the execution of this operation is the memory address which is been used to fetch a word and then the top four elements in the stack are saved into the specified memory address. The items are not removed from the stack. The diagram below illustrates this graphically.
+The `MSTOREW` operation stores a word (4 elements) from the stack into the specified memory address. The address is specified by the top stack element. The stored elements are not removed from the stack. The diagram below illustrates this graphically.
 
 ![mstorew](../../assets/design/stack/io_operations/MSTOREW.png)
 
-To facilitate this operation, we will need to perform a lookup into the memory table at the specified address using the current values of context and clock cycle registers described [here](https://maticnetwork.github.io/miden/design/chiplets/memory.html). 
+To simplify description of memory access request value, we first define the following variables:
 
-Let's define a few intermediate variables to simplify constraint description:
-
-$$
-v_h = \alpha_0 + \alpha_1 \cdot 8 + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk1
-$$
+The value representing state of memory before the operation (set by the prover nondeterministically in registers $h_0, ..., h_3$):
 
 $$
-v_{n} = \sum_{i=0}^3\alpha_{i+4} \cdot s_i'
+v_{old} = \sum_{i=0}^3\alpha_{i+4} \cdot h_i
 $$
 
+The value representing state of memory after the operation:
+
 $$
-v_{o} = \sum_{i=0}^3\alpha_{i+8} \cdot m_i
+v_{new} = \sum_{i=0}^3\alpha_{i+8} \cdot s_{3-i}'
+$$
+
+Using the above variables, we define the value representing the memory access request as follows:
+
+$$
+u_{mem} = \alpha_0 + \alpha_1 \cdot op_{mem} + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk + v_{old} + v_{new}
 $$
 
 In the above:
-- $v_h$ is a _common header_ which is a combination of unique identifier, memory address and clock cycle. The $8$ in the permutation check is the unique identifier of `MEMORY` operation which has been explained [here](../chiplets/main.md#operation-labels).
-- $clk1$ is the clock cycle and $\alpha_0$, $\alpha_1$, $\alpha_2$ etc... are random values sent from the verifier to the prover for use in permutation checks.
-- Values for the helper registers $m_0, m_1, m_2, m_3$ are provided by the VM non-deterministically and represent old memory at the specified address.
-- $v_{n}$ and $v_{o}$ can be thought of as component of new and old memory value (whole word) in the permutation check calculation.  
+- $op_{mem}$ is the unique [operation label](../chiplets/main.md#operation-labels) of the memory access operation.
+- $s_0$ is the memory address into which the values from the stack are to be saved.
+- $clk$ is the current clock cycle of the VM.
 
-The lookup in the table can be accomplished by including the value into the lookup product such that it follows the following constraint:
+The effect of this operation on the rest of the stack is:
+* **Left shift** starting from position $1$.
 
-> $$
-s_j' - s_{j+1} = 0 \space where \space j \in \{0, 1, 2, 3\} \text{ | degree } = 1\\
-b_{aux}' \cdot \left(v_h + v_{n} + v_{o}\right) = b_{aux} \text{ | degree } = 2
+### MSTORE
+The `MSTORE` operation is similar to the `MSTOREW` operation but instead updating the entire word in memory, we update only the first element of the word at the specified memory address. The remaining three elements of the word are not affected. The diagram below illustrates this graphically.
+
+![mstore](../../assets/design/stack/io_operations/MSTORE.png)
+
+To simplify description of memory access request value, we first define the following variables:
+
+The value representing state of memory before the operation (set by the prover nondeterministically in registers $h_0, ..., h_3$):
+
+$$
+v_{old} = \sum_{i=0}^3\alpha_{i+4} \cdot h_i
 $$
 
-where $b_{aux}$ is the running product column of auxiliary table. We are not including context in the permutation check as its not yet been implemented. We plan to add context to memory in $v3.0$.
+The value representing state of memory after the operation:
 
-We store the old memory values in the helper registers during the lookup.
+$$
+v_{new} = \alpha_4 \cdot s_0' + \sum_{i=1}^3\alpha_{i+8} \cdot h_i'
+$$
 
-The `MSTOREW` operation will shift the stack to left by one. The maximum degree of the above operation is $2$.
+Using the above variables, we define the value representing the memory access request as follows:
+
+$$
+u_{mem} = \alpha_0 + \alpha_1 \cdot op_{mem} + \alpha_2 \cdot s_0 + \alpha_3 \cdot clk + v_{old} + v_{new}
+$$
+
+In the above:
+- $op_{mem}$ is the unique [operation label](../chiplets/main.md#operation-labels) of the memory access operation.
+- $s_0$ is the memory address into which the value from the stack is to be saved.
+- $clk$ is the current clock cycle of the VM.
+
+The effect of this operation on the rest of the stack is:
+* **Left shift** starting from position $1$.

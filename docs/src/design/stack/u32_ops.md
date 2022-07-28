@@ -244,7 +244,7 @@ Assume $a$ and $b$ are the values at the top of the stack. The `U32AND` operatio
 
 ![u32and](../../assets/design/stack/u32_operations/U32AND.png)
 
-To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the representing bitwise operation request. This can be enforced with the following constraint:
+To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the value representing bitwise operation request. This can be enforced with the following constraint:
 
 >$$
 b_{chip}' \cdot \left(\alpha_0 + \alpha_1 \cdot op_{u32and} + \alpha_2 \cdot s_0 + \alpha_3 \cdot s_1 +  \alpha_4 \cdot s_0'  \right) = b_{chip} \text{ | degree } = 2
@@ -262,7 +262,7 @@ Assume $a$ and $b$ are the values at the top of the stack. The `U32OR` operation
 
 ![u32or](../../assets/design/stack/u32_operations/U32OR.png)
 
-To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the representing bitwise operation request. This can be enforced with the following constraint:
+To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the value representing bitwise operation request. This can be enforced with the following constraint:
 
 > $$
 b_{chip}' \cdot \left(\alpha_0 + \alpha_1 \cdot op_{u32or} + \alpha_2 \cdot s_0 + \alpha_3 \cdot s_1 +  \alpha_4 \cdot s_0'  \right) = b_{chip} \text{ | degree } = 2
@@ -280,7 +280,7 @@ Assume $a$ and $b$ are the values at the top of the stack. The `U32XOR` operatio
 
 ![u32xor](../../assets/design/stack/u32_operations/U32XOR.png)
 
-To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the representing bitwise operation request. This can be enforced with the following constraint:
+To facilitate this operation, we will need to make a request to the chiplet bus $b_{chip}$ by dividing its current value by the value representing bitwise operation request. This can be enforced with the following constraint:
 
 > $$
 b_{chip}' \cdot \left(\alpha_0 + \alpha_1 \cdot op_{u32xor} + \alpha_2 \cdot s_0 + \alpha_3 \cdot s_1 +  \alpha_4 \cdot s_0'  \right) = b_{chip} \text{ | degree } = 2
