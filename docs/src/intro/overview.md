@@ -3,7 +3,7 @@ Miden VM is a stack machine. The base data type of the MV is a field element in 
 
 Miden VM consists of three high-level components as illustrated below.
 
-![](https://hackmd.io/_uploads/SyERLVphK.png)
+![](../assets/intro/vm_components.png)
 
 These components are:
 * **Stack** which is a push-down stack where each item is a field element. Most assembly instructions operate with values located on the stack. The stack can grow up to $2^{16}$ items deep, however, only the top 16 items are directly accessible.
