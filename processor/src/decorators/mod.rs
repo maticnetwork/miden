@@ -17,9 +17,16 @@ impl Process {
                         .append_asmop(self.system.clk(), assembly_op.clone());
                 }
             }
+            Decorator::ProcMarker(_) => {
+                if self.decoder.in_debug_mode() {
+                    self.decoder
+                        .append_proc_marker(self.system.clk(), decorator.clone());
+                }
+            }
         }
         Ok(())
     }
+
     // ADVICE INJECTION
     // --------------------------------------------------------------------------------------------
 

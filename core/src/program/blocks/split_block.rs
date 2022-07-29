@@ -1,4 +1,5 @@
 use super::{fmt, hasher, Box, CodeBlock, Digest};
+use crate::{utils::collections::Vec, Decorator};
 
 // SPLIT BLOCK
 // ================================================================================================
@@ -15,6 +16,7 @@ use super::{fmt, hasher, Box, CodeBlock, Digest};
 pub struct Split {
     branches: Box<[CodeBlock; 2]>,
     hash: Digest,
+    proc_markers: Vec<Decorator>,
 }
 
 impl Split {
@@ -26,6 +28,7 @@ impl Split {
         Self {
             branches: Box::new([t_branch, f_branch]),
             hash,
+            proc_markers: Vec::new(),
         }
     }
 
@@ -47,6 +50,18 @@ impl Split {
     /// is `0`.
     pub fn on_false(&self) -> &CodeBlock {
         &self.branches[1]
+    }
+
+    /// If a procedure starts at this split block, returns ProcMarker [Decorator] corresponding to
+    /// the procedure. Returns None otherwise.
+    pub fn proc_markers(&self) -> &[Decorator] {
+        &self.proc_markers
+    }
+
+    /// If a procedure starts at this join block, adds ProcMarker [Decorator] corresponding the
+    /// procedure to this split block.
+    pub fn append_proc_marker(&mut self, proc_marker: Decorator) {
+        self.proc_markers.push(proc_marker);
     }
 }
 

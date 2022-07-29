@@ -35,21 +35,21 @@ impl<'a> AssemblyContext<'a> {
         self.local_procs.contains_key(label) || self.imported_procs.contains_key(label)
     }
 
-    /// Returns a code root of a procedure for the specified label from this context.
-    pub fn get_proc_code(&self, label: &str) -> Option<&CodeBlock> {
+    /// Returns a code root and num_locals of a procedure for the specified label from this context.
+    pub fn get_proc_code(&self, label: &str) -> Option<(&CodeBlock, u32)> {
         // `expect()`'s are OK here because we first check if a given map contains the key
         if self.imported_procs.contains_key(label) {
             let proc = *self
                 .imported_procs
                 .get(label)
                 .expect("no procedure after contains");
-            Some(proc.code_root())
+            Some((proc.code_root(), proc.num_locals()))
         } else if self.local_procs.contains_key(label) {
             let proc = self
                 .local_procs
                 .get(label)
                 .expect("no procedure after contains");
-            Some(proc.code_root())
+            Some((proc.code_root(), proc.num_locals()))
         } else {
             None
         }

@@ -1,5 +1,5 @@
 use super::{fmt, hasher, Digest, Felt, FieldElement, Operation, Vec};
-use crate::{DecoratorIterator, DecoratorList};
+use crate::{Decorator, DecoratorIterator, DecoratorList};
 use winter_utils::flatten_slice_elements;
 
 // CONSTANTS
@@ -90,6 +90,17 @@ impl Span {
         &self.op_batches
     }
 
+    /// Returns a list of decorators in this span block
+    pub fn decorators(&self) -> &DecoratorList {
+        &self.decorators
+    }
+
+    /// Returns a [DecoratorIterator] which allows us to iterate through the decorator list of this span
+    /// block while executing operation batches of this span block
+    pub fn decorator_iter(&self) -> DecoratorIterator {
+        DecoratorIterator::new(&self.decorators)
+    }
+
     // SPAN MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -112,22 +123,23 @@ impl Span {
         Self::with_decorators(ops, decorators)
     }
 
-    /// Returns a list of decorators in this span block
-    pub fn decorators(&self) -> &DecoratorList {
-        &self.decorators
+    /// Marks the start of procedure in this span block and stores the corresponding
+    /// ProcMarker [Decorator].
+    pub fn set_proc_start(&mut self, proc_marker: Decorator, idx: usize) {
+        self.decorators.insert(0, (idx, proc_marker));
     }
 
-    /// Returns a [DecoratorIterator] which allows us to iterate through the decorator list of this span
-    /// block while executing operation batches of this span block
-    pub fn decorator_iter(&self) -> DecoratorIterator {
-        DecoratorIterator::new(&self.decorators)
+    /// Marks the end of procedure in this span block and stores the corresponding
+    /// ProcMarker [Decorator].
+    pub fn set_proc_end(&mut self, proc_marker: Decorator, idx: usize) {
+        self.decorators.push((idx, proc_marker));
     }
 
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
     /// Returns a list of operations contained in this span block.
-    fn get_ops(&self) -> Vec<Operation> {
+    pub fn get_ops(&self) -> Vec<Operation> {
         let mut ops = Vec::with_capacity(self.op_batches.len() * MAX_OPS_PER_BATCH);
         for batch in self.op_batches.iter() {
             ops.extend_from_slice(&batch.ops);

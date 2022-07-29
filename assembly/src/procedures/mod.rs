@@ -35,6 +35,11 @@ impl Procedure {
         self.is_export
     }
 
+    /// Returns num_locals of this procedure.
+    pub fn num_locals(&self) -> u32 {
+        self.num_locals
+    }
+
     // PARSER
     // --------------------------------------------------------------------------------------------
 

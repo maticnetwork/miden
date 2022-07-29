@@ -1,6 +1,6 @@
 use crate::{ExecutionError, Felt, Process, StarkField, Vec};
 use core::fmt;
-use vm_core::{utils::string::String, Operation, Word};
+use vm_core::{utils::string::String, Decorator, Operation, ProcMarker, Word};
 
 /// VmState holds a current process state information at a specific clock cycle.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -8,6 +8,7 @@ pub struct VmState {
     pub clk: usize,
     pub op: Option<Operation>,
     pub asmop: Option<AsmOpInfo>,
+    pub proc_stack: Vec<ProcInfo>,
     pub fmp: Felt,
     pub stack: Vec<Felt>,
     pub memory: Vec<(u64, Word)>,
@@ -39,6 +40,8 @@ pub struct VmStateIterator {
     error: Option<ExecutionError>,
     clk: usize,
     asmop_idx: usize,
+    proc_stack: Vec<ProcInfo>,
+    proc_idx: usize,
 }
 
 impl VmStateIterator {
@@ -48,6 +51,8 @@ impl VmStateIterator {
             error: result.err(),
             clk: 0,
             asmop_idx: 0,
+            proc_stack: Vec::new(),
+            proc_idx: 0,
         }
     }
 
@@ -107,6 +112,45 @@ impl VmStateIterator {
             (None, false)
         }
     }
+
+    /// Pushes procedures to proc_stack when new procedures starts executing.
+    fn push_procs(&mut self) {
+        if self.clk != 0 {
+            let mut proc_idx = self.proc_idx;
+            let proc_markers = self.process.decoder.debug_info().proc_markers();
+            // Keep adding procedures from the stack as long as a ProcMarker decorator
+            // is present at the current clock cycle.
+            while proc_markers.len() > proc_idx && proc_markers[proc_idx].0 == self.clk - 1 {
+                if let Decorator::ProcMarker(ProcMarker::ProcStarted(label, num_locals)) =
+                    &proc_markers[proc_idx].1
+                {
+                    self.proc_stack
+                        .push(ProcInfo::new(label.clone(), *num_locals, self.clk))
+                }
+                proc_idx += 1;
+            }
+        }
+    }
+
+    /// Pops procedures from proc_stack when procedures end.
+    fn pop_procs(&mut self) {
+        if self.clk != 0 {
+            let proc_markers = self.process.decoder.debug_info().proc_markers();
+            // Keep removing procedures from the stack as long as a ProcMarker decorator
+            // is present at the current clock cycle.
+            while proc_markers.len() > self.proc_idx
+                && proc_markers[self.proc_idx].0 == self.clk - 1
+            {
+                if matches!(
+                    proc_markers[self.proc_idx].1,
+                    Decorator::ProcMarker(ProcMarker::ProcEnded)
+                ) {
+                    self.proc_stack.pop();
+                }
+                self.proc_idx += 1;
+            }
+        }
+    }
 }
 
 impl Iterator for VmStateIterator {
@@ -132,11 +176,13 @@ impl Iterator for VmStateIterator {
         if is_start {
             self.asmop_idx += 1;
         }
+        self.push_procs();
 
         let result = Some(Ok(VmState {
             clk: self.clk,
             op,
             asmop,
+            proc_stack: self.proc_stack.clone(),
             fmp: self.process.system.get_fmp_at(self.clk),
             stack: self.process.stack.get_state_at(self.clk),
             memory: self
@@ -145,6 +191,7 @@ impl Iterator for VmStateIterator {
                 .get_mem_values_at(0..=u64::MAX, self.clk as u64),
         }));
 
+        self.pop_procs();
         self.clk += 1;
 
         result
@@ -162,6 +209,9 @@ fn word_to_ints(word: &Word) -> [u64; 4] {
     ]
 }
 
+// ASMOP INFO
+// =================================================================
+
 /// Contains assembly instruction and operation index in the sequence corresponding to the specified
 /// AsmOp decorator. This index starts from 1 instead of 0.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -170,9 +220,6 @@ pub struct AsmOpInfo {
     num_cycles: u8,
     cycle_idx: u8,
 }
-
-// ASMOP STATE
-// =================================================================
 
 impl AsmOpInfo {
     /// Returns [AsmOpInfo] instantiated with the specified assembly instruction string, number of
@@ -211,5 +258,27 @@ impl AsmOpInfo {
     /// of operations corresponding to the current assembly instruction.
     pub fn cycle_idx(&self) -> u8 {
         self.cycle_idx
+    }
+}
+
+// PROC INFO
+// =================================================================
+
+/// Stores label and start cycle of a procedure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProcInfo {
+    label: String,
+    num_locals: u32,
+    start_clk: usize,
+}
+
+impl ProcInfo {
+    /// Returns a new [ProcInfo] instantiated with the specified lable nad start clock cycle.
+    pub fn new(label: String, num_locals: u32, start_clk: usize) -> Self {
+        Self {
+            label,
+            num_locals,
+            start_clk,
+        }
     }
 }

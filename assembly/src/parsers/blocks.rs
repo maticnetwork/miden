@@ -2,7 +2,10 @@ use super::{
     parse_op_token, AssemblyContext, AssemblyError, CodeBlock, Operation, String, Token,
     TokenStream, Vec,
 };
-use vm_core::{utils::group_vector_elements, DecoratorList};
+use vm_core::{
+    utils::{group_vector_elements, string::ToString},
+    Decorator, DecoratorList, ProcMarker,
+};
 
 // BLOCK PARSER
 // ================================================================================================
@@ -208,14 +211,15 @@ impl BlockParser {
             Self::Exec(label) => {
                 // --------------------------------------------------------------------------------
                 // retrieve the procedure block from the proc map and consume the 'exec' token
-                let proc_root = context
-                    .get_proc_code(label)
-                    .ok_or_else(|| {
-                        AssemblyError::undefined_proc(tokens.read().expect("no exec token"), label)
-                    })?
-                    .clone();
+                let (proc_root, num_locals) = context.get_proc_code(label).ok_or_else(|| {
+                    AssemblyError::undefined_proc(tokens.read().expect("no exec token"), label)
+                })?;
+                let mut proc_root_mut = proc_root.clone();
                 tokens.advance();
-                Ok(proc_root)
+                if in_debug_mode {
+                    add_proc_marker(&mut proc_root_mut, label.to_string(), num_locals);
+                }
+                Ok(proc_root_mut)
             }
         }
     }
@@ -330,4 +334,30 @@ pub fn combine_spans(spans: &mut Vec<CodeBlock>) -> CodeBlock {
         }
     });
     CodeBlock::new_span_with_decorators(ops, decorators)
+}
+
+/// Helper function to add ProcMarker decorator to the proc root block when "exec" token is encountered.
+fn add_proc_marker(proc_root: &mut CodeBlock, label: String, num_locals: u32) {
+    match proc_root {
+        CodeBlock::Span(block) => {
+            block.set_proc_start(
+                Decorator::ProcMarker(ProcMarker::ProcStarted(label, num_locals)),
+                0,
+            );
+            block.set_proc_end(
+                Decorator::ProcMarker(ProcMarker::ProcEnded),
+                block.get_ops().len() - 1,
+            );
+        }
+        CodeBlock::Join(block) => block.append_proc_marker(Decorator::ProcMarker(
+            ProcMarker::ProcStarted(label, num_locals),
+        )),
+        CodeBlock::Split(block) => block.append_proc_marker(Decorator::ProcMarker(
+            ProcMarker::ProcStarted(label, num_locals),
+        )),
+        CodeBlock::Loop(block) => block.append_proc_marker(Decorator::ProcMarker(
+            ProcMarker::ProcStarted(label, num_locals),
+        )),
+        _ => (),
+    }
 }
