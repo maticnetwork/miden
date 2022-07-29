@@ -169,3 +169,28 @@ To solve these issues for the general case, we can take the following approach t
 #### Make the selector columns update "one cycle early":
 
 An idea from Bobbin that hasn't been discussed or investigated in depth yet.
+
+## Chiplet bus
+
+Miden VM has a running product column $p_0$ which is used to tie the co-processor with the main VM's stack. When receiving inputs from or returning results to the stack, the procesor multiplies $p_0$ by their respective values(unique identifier is a component of it). On the other side, when sending inputs to these co-processor or receiving results from the co-processor, the stack divides $p_0$ by their values. We use boundary constraints to ensure that the running product column started and ended with a value of 1. If that is the case, then all of our lookups must have matched all of the computations that were executed in the co-processor (all of which were provably correct).
+
+### Operation labels
+
+We have created a separate unique identifier of an operation which is a component of this permutation check to further ensure that the values stack looking up from the "lookup" table is indeed coming from the intended co-processor for that operation and not from somewhere else.
+
+The identifiers are made up using the selector and internal selector(if they have it) flag values of an operation. A binary aggregation is done on the combined aggregated value of selector and internal selector. When $1$ is added to the binary aggregated value, we get the unique value of the operation. 
+
+
+| Operation              | Selector flag | Internal Selector Flag | Combined flag    | Label | 
+| ---------------------- | :-----------: | :--------------------: | ---------------- | :---: |
+| `HASHER_LINER_HASH`    | $\{0\}$       | $\{1, 0, 0\}$          | $\{0, 1, 0, 0\}$ | 3     |
+| `HASHER_MP_VERIFY`     | $\{0\}$       | $\{1, 0, 1\}$          | $\{0, 1, 0, 1\}$ | 11    |
+| `HASHER_MR_UPDATE_OLD` | $\{0\}$       | $\{1, 1, 0\}$          | $\{0, 1, 1, 0\}$ | 7     |
+| `HASHER_MR_UPDATE_NEW` | $\{0\}$       | $\{1, 1, 1\}$          | $\{0, 1, 1, 1\}$ | 15    |
+| `HASHER_RETURN_HASH`   | $\{0\}$       | $\{0, 0, 0\}$          | $\{0, 0, 0, 0\}$ | 1     |
+| `HASHER_RETURN_STATE`  | $\{0\}$       | $\{0, 0, 1\}$          | $\{0, 0, 0, 1\}$ | 9     |
+| `BITWISE_AND`          | $\{1, 0\}$    | $\{0, 0\}$             | $\{1, 0, 0, 0\}$ | 2     |
+| `BITWISE_OR`           | $\{1, 0\}$    | $\{0, 1\}$             | $\{1, 0, 0, 1\}$ | 10    |
+| `BITWISE_XOR`          | $\{1, 0\}$    | $\{1, 0\}$             | $\{1, 0, 1, 0\}$ | 6     |
+| `MEMORY`               | $\{1, 1, 1\}$ | NA                     | $\{1, 1, 1\}$    | 8     |
+

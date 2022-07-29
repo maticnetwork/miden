@@ -1,6 +1,6 @@
 # Bitwise Chiplet
 
-In this note we describe how to compute bitwise AND, OR, and XOR operations on 32-bit values and the constraints required for proving correct execution. It assumes some familiarity with [permutation checks](https://hackmd.io/@arielg/ByFgSDA7D).
+In this note we describe how to compute bitwise AND, OR, and XOR operations on 32-bit values and the constraints required for proving correct execution.
 
 Assume that $a$ and $b$ are field elements in a 64-bit prime field. Assume also that $a$ and $b$ are known to contain values smaller than $2^{32}$. We want to compute $a \oplus b \rightarrow z$, where $\oplus$ is either bitwise AND, OR, or XOR, and $z$ is a field element containing the result of the corresponding bitwise operation.
 

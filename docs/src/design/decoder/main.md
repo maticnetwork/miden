@@ -12,7 +12,6 @@ The sections below describe how Miden VM decoder works. Throughout these section
 1. An opcode requires $7$ bits to represent.
 2. An immediate value requires one full field element to represent.
 3. A `NOOP` operation has a numeric value of $0$, and thus, can be encoded as seven zeros. Executing a `NOOP` operation does not change the state of the VM, but it does advance operation counter, and may affect program hash.
-4. The verifier sends a set of random values $\alpha_0$, $\alpha_1$ etc. to the prover after the prover commits to the execution trace of the program. These random values are used for multi-set checks similar to the ones described [here](https://hackmd.io/@arielg/ByFgSDA7D).
 
 ## Program execution
 

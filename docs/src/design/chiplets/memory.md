@@ -1,12 +1,10 @@
 # Memory Chiplet
 
-This note assumes some familiarity with [permutation checks](https://hackmd.io/@arielg/ByFgSDA7D).
-
 Miden VM supports linear read-write random access memory. This memory is word-addressable, meaning, four values are located at each address, and we can read and write values to/from memory in batches of four. Each value is a field element in a $64$-bit prime field with modulus $2^{64} - 2^{32} + 1$. Memory address can be any field element.
 
 In this note we describe the rational for selecting the above design and describe AIR constraints needed to support it.
 
-The design makes extensive use of $16$-bit range checks. An efficient way of implementing such range checks is described [here](https://hackmd.io/D-vjBYtHQB2BuOB-HMUG5Q).
+The design makes extensive use of $16$-bit range checks. An efficient way of implementing such range checks is described [here](../range.md).
 
 ## Alternative designs
 

@@ -312,9 +312,9 @@ pub enum Operation {
     /// capacity, the stack should look like [C, B, A, ...] from the top.
     RpPerm,
 
-    /// Computes a root of a Merkle path for the specified node. This operation can be used to
-    /// prove that the prover knows a path in the specified Merkle tree which starts with the
-    /// specified node.
+    /// Verifies that a Merkle path from the specified node resolves to the specified root. This
+    /// operation can be used to prove that the prover knows a path in the specified Merkle tree
+    /// which starts with the specified node.
     ///
     /// The stack is expected to be arranged as follows (from the top):
     /// - depth of the path, 1 element.
@@ -323,9 +323,8 @@ pub enum Operation {
     /// - root of the tree, 4 elements.
     ///
     /// The Merkle path itself is expected to be provided by the prover non-deterministically (via
-    /// advice sets). At the end of the operation, and the node values are replaced with the
-    /// computed root, but everything else remains the same. Thus, if the correct Merkle path was
-    /// provided, the computed root and the provided root must be the same.
+    /// advice sets). If the prover is not able to provide the required path, the operation fails.
+    /// Otherwise, the state of the stack does not change.
     MpVerify,
 
     /// Computes a new root of a Merkle tree where a node at the specified position is updated to

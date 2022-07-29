@@ -193,8 +193,8 @@ impl Process {
 /// of the executed program, as well as building an execution trace for these computations.
 ///
 /// ## Execution trace
-/// Decoder execution trace currently consists of 19 columns as illustrated below (this will
-/// be increased to 24 columns in the future):
+/// Decoder execution trace currently consists of 22 columns as illustrated below (this will
+/// be increased to 23 columns in the future):
 ///
 ///  addr b0 b1 b2 b3 b4 b5 b6 h0 h1 h2 h3 h4 h5 h6 h7 in_span g_count op_idx c0 c1 c2
 /// ├────┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴───────┴───────┴──────┴──┴──┴──┤
