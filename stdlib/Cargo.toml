@@ -1,0 +1,19 @@
+[package]
+name = "miden-stdlib"
+version = "0.1.0"
+description = "Miden VM standard library"
+authors = ["miden contributors"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/maticnetwork/miden"
+categories = ["cryptography", "mathematics"]
+keywords = ["miden", "program", "stdlib"]
+edition = "2021"
+rust-version = "1.60"
+
+[lib]
+bench = false
+doctest = false
+
+[dependencies]
+vm-core = { package = "miden-core", default-features = false, path = "../core", version = "0.2" }

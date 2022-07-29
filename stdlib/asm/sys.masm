@@ -1,0 +1,24 @@
+# Removes elements deep in the stack until the depth of the stack is exactly 16. The elements
+# are removed in such a way that the top 16 elements of the stack remain unchanged.
+# Input: Stack with 16 or more elements.
+# Output: Stack with only the original top 16 elements.
+export.finalize_stack.4
+    popw.local.0
+    popw.local.1
+    popw.local.2
+    popw.local.3
+    push.env.sdepth
+    neq.16
+    while.true
+        dropw
+        push.env.sdepth
+        neq.16
+    end
+    loadw.local.3
+    swapw.3
+    loadw.local.2
+    swapw.2
+    loadw.local.1
+    swapw.1
+    loadw.local.0
+end

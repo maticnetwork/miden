@@ -1,6 +1,6 @@
 [package]
 name = "miden"
-version = "0.1.0"
+version = "0.2.0"
 description="Miden virtual machine"
 authors = ["miden contributors"]
 readme="README.md"
@@ -8,7 +8,15 @@ license = "MIT"
 repository = "https://github.com/maticnetwork/miden"
 categories = ["cryptography", "emulators", "no-std"]
 keywords = ["miden", "stark", "virtual-machine", "zkp"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
+
+[[bin]]
+name = "miden"
+path = "src/main.rs"
+bench = false
+doctest = false
+required-features = ["executable"]
 
 [lib]
 name = "miden"
@@ -19,13 +27,30 @@ doctest = false
 [features]
 concurrent = ["prover/concurrent", "std"]
 default = ["std"]
-std = ["air/std", "assembly/std", "hex/std", "processor/std", "prover/std", "verifier/std"]
+executable = ["crypto", "env_logger", "hex/std", "std", "serde/std", "serde_derive", "serde_json/std", "structopt", "winter-utils"]
+std = ["air/std", "assembly/std", "log/std", "processor/std", "prover/std", "verifier/std", "vm-core/std"]
 
 [dependencies]
-air = { package = "miden-air", path = "../air", version = "0.1", default-features = false }
-assembly = { package = "miden-assembly", path = "../assembly", version = "0.1", default-features = false }
-processor = { package = "miden-processor", path = "../processor", version = "0.1", default-features = false }
-prover = { package = "winter-prover", version = "0.2", default-features = false }
+air = { package = "miden-air", path = "../air", version = "0.2", default-features = false }
+assembly = { package = "miden-assembly", path = "../assembly", version = "0.2", default-features = false }
+crypto = { package = "winter-crypto", version = "0.4", default-features = false, optional = true }
+env_logger = { version = "0.9", default-features = false, optional = true }
 hex = { version = "0.4", optional = true }
 log = { version = "0.4", default-features = false }
-verifier = { package = "miden-verifier", path = "../verifier", version = "0.1", default-features = false }
+processor = { package = "miden-processor", path = "../processor", version = "0.2", default-features = false }
+prover = { package = "miden-prover", path = "../prover", version = "0.1", default-features = false }
+serde = {version = "1.0.117", optional = true }
+serde_derive = {version = "1.0.117", optional = true }
+serde_json = {version = "1.0.59", optional = true }
+structopt = { version = "0.3", default-features = false, optional = true }
+verifier = { package = "miden-verifier", path = "../verifier", version = "0.2", default-features = false }
+winter-utils = { package = "winter-utils", version = "0.4", optional = true }
+vm-core = { package = "miden-core", path = "../core", version = "0.2", default-features = false }
+
+[dev-dependencies]
+blake3 = "1.3.1"
+num-bigint = "0.4"
+proptest = "1.0.0"
+rand-utils = { package = "winter-rand-utils", version = "0.4" }
+sha2 = "0.10.2"
+sha3 = "0.10.1"

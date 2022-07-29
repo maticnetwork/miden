@@ -1,5 +1,8 @@
 # Miden assembly
-This crate contains Miden assembler and description of the Miden assembly language (located [here](doc/assembly.md)).
+
+> This documentation has some deprecated snippets, this means that should be use just as reference to study purpose. It'll be rewritten in a near future.
+
+This crate contains Miden assembler and description of the Miden assembly language located [here (deprecated documentation)](/../main/assembly/doc/assembly.md).
 
 The purpose of the assembler is to compile Miden assembly source code into a Miden VM program (represented by `Program` struct). The program can then be executed on Miden VM [processor](../processor).
 

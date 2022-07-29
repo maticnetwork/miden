@@ -1,75 +1,138 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
+
 use core::ops::Range;
 
-// EXPORTS
-// ================================================================================================
+pub mod chiplets;
+pub use chiplets::hasher;
+pub mod decoder;
+pub mod errors;
+pub mod range;
 
-pub use math::{fields::f128::BaseElement, FieldElement, StarkField};
-pub mod hasher;
-pub mod op_sponge;
-pub mod opcodes;
-pub mod program;
+pub use math::{fields::f64::BaseElement as Felt, ExtensionOf, FieldElement, StarkField};
+
+mod program;
+pub use program::{blocks as code_blocks, Library, Program};
+
+mod operations;
+pub use operations::{
+    AdviceInjector, AssemblyOp, Decorator, DecoratorIterator, DecoratorList, Operation,
+};
+
+mod inputs;
+pub use inputs::{AdviceSet, ProgramInputs};
+
 pub mod utils;
+use utils::range;
 
-mod trace_state;
-pub use trace_state::TraceState;
-
-// GLOBAL CONSTANTS
+// TYPE ALIASES
 // ================================================================================================
 
-pub const MAX_CONTEXT_DEPTH: usize = 16;
-pub const MAX_LOOP_DEPTH: usize = 8;
-pub const MIN_TRACE_LENGTH: usize = 16;
-pub const BASE_CYCLE_LENGTH: usize = 16;
+pub type Word = [Felt; 4];
 
-pub const MIN_STACK_DEPTH: usize = 8;
-pub const MIN_CONTEXT_DEPTH: usize = 1;
-pub const MIN_LOOP_DEPTH: usize = 1;
+pub type StackTopState = [Felt; MIN_STACK_DEPTH];
 
-// PUSH OPERATION
+// CONSTANTS
+// ================================================================================================
+
+/// Field element representing ZERO in the base field of the VM.
+pub const ZERO: Felt = Felt::ZERO;
+
+/// Field element representing ONE in the base field of the VM.
+pub const ONE: Felt = Felt::ONE;
+
+/// The minimum length of the execution trace. This is the minimum required to support range checks.
+pub const MIN_TRACE_LEN: usize = 1024;
+
+/// The minimum stack depth enforced by the VM. This is also the number of stack registers which can
+/// be accessed by the VM directly.
+pub const MIN_STACK_DEPTH: usize = 16;
+
+/// Number of bookkeeping and helper columns in the stack trace.
+pub const NUM_STACK_HELPER_COLS: usize = 3;
+
+// MAIN TRACE LAYOUT
 // ------------------------------------------------------------------------------------------------
-pub const PUSH_OP_ALIGNMENT: usize = 8;
 
-// HASH OPERATION
+//      system          decoder           stack      range checks    chiplets
+//    (2 columns)     (22 columns)    (19 columns)    (4 columns)     (18 columns)
+// ├───────────────┴───────────────┴───────────────┴───────────────┴─────────────────┤
+
+pub const SYS_TRACE_OFFSET: usize = 0;
+pub const SYS_TRACE_WIDTH: usize = 2;
+pub const SYS_TRACE_RANGE: Range<usize> = range(SYS_TRACE_OFFSET, SYS_TRACE_WIDTH);
+
+pub const CLK_COL_IDX: usize = SYS_TRACE_OFFSET;
+pub const FMP_COL_IDX: usize = SYS_TRACE_OFFSET + 1;
+
+// decoder trace
+pub const DECODER_TRACE_OFFSET: usize = SYS_TRACE_OFFSET + SYS_TRACE_WIDTH;
+pub const DECODER_TRACE_WIDTH: usize = 22;
+pub const DECODER_TRACE_RANGE: Range<usize> = range(DECODER_TRACE_OFFSET, DECODER_TRACE_WIDTH);
+
+// Stack trace
+pub const STACK_TRACE_OFFSET: usize = DECODER_TRACE_OFFSET + DECODER_TRACE_WIDTH;
+pub const STACK_TRACE_WIDTH: usize = MIN_STACK_DEPTH + NUM_STACK_HELPER_COLS;
+pub const STACK_TRACE_RANGE: Range<usize> = range(STACK_TRACE_OFFSET, STACK_TRACE_WIDTH);
+
+// Range check trace
+pub const RANGE_CHECK_TRACE_OFFSET: usize = STACK_TRACE_OFFSET + STACK_TRACE_WIDTH;
+pub const RANGE_CHECK_TRACE_WIDTH: usize = 4;
+pub const RANGE_CHECK_TRACE_RANGE: Range<usize> =
+    range(RANGE_CHECK_TRACE_OFFSET, RANGE_CHECK_TRACE_WIDTH);
+
+// Chiplets trace
+pub const CHIPLETS_OFFSET: usize = RANGE_CHECK_TRACE_OFFSET + RANGE_CHECK_TRACE_WIDTH;
+pub const CHIPLETS_WIDTH: usize = 18;
+pub const CHIPLETS_RANGE: Range<usize> = range(CHIPLETS_OFFSET, CHIPLETS_WIDTH);
+
+// Chiplets components
+pub const MEMORY_TRACE_WIDTH: usize = 14;
+
+pub const TRACE_WIDTH: usize = CHIPLETS_OFFSET + CHIPLETS_WIDTH;
+
+// AUXILIARY COLUMNS LAYOUT
 // ------------------------------------------------------------------------------------------------
-const HASHER_STATE_RATE: usize = 4;
-const HASHER_STATE_CAPACITY: usize = 2;
-const HASHER_NUM_ROUNDS: usize = 10;
-const HASHER_DIGEST_SIZE: usize = 2;
 
-// OPERATION SPONGE
-// ------------------------------------------------------------------------------------------------
-const OP_SPONGE_WIDTH: usize = 4;
-const PROGRAM_DIGEST_SIZE: usize = 2;
-pub const HACC_NUM_ROUNDS: usize = 14;
+//      decoder         stack       range checks      hasher      chiplets
+//    (3 columns)     (1 column)     (3 columns)    (1 column)       (1 column)
+// ├───────────────┴──────────────┴──────────────┴───────────────┴───────────────┤
 
-// DECODER LAYOUT
-// ------------------------------------------------------------------------------------------------
-//
-//  ctr ╒═════ sponge ══════╕╒═══ cf_ops ══╕╒═══════ ld_ops ═══════╕╒═ hd_ops ╕╒═ ctx ══╕╒═ loop ═╕
-//   0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   ..   ..   ..
-// ├────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┤
+// Decoder auxiliary columns
+pub const DECODER_AUX_TRACE_OFFSET: usize = 0;
+pub const DECODER_AUX_TRACE_WIDTH: usize = 3;
+pub const DECODER_AUX_TRACE_RANGE: Range<usize> =
+    range(DECODER_AUX_TRACE_OFFSET, DECODER_AUX_TRACE_WIDTH);
 
-pub const NUM_CF_OP_BITS: usize = 3;
-pub const NUM_LD_OP_BITS: usize = 5;
-pub const NUM_HD_OP_BITS: usize = 2;
+// Stack auxiliary columns
+pub const STACK_AUX_TRACE_OFFSET: usize = DECODER_AUX_TRACE_RANGE.end;
+pub const STACK_AUX_TRACE_WIDTH: usize = 1;
+pub const STACK_AUX_TRACE_RANGE: Range<usize> =
+    range(STACK_AUX_TRACE_OFFSET, STACK_AUX_TRACE_WIDTH);
 
-pub const NUM_CF_OPS: usize = 8;
-pub const NUM_LD_OPS: usize = 32;
-pub const NUM_HD_OPS: usize = 4;
+// Range check auxiliary columns
+pub const RANGE_CHECK_AUX_TRACE_OFFSET: usize = STACK_AUX_TRACE_RANGE.end;
+pub const RANGE_CHECK_AUX_TRACE_WIDTH: usize = 3;
+pub const RANGE_CHECK_AUX_TRACE_RANGE: Range<usize> =
+    range(RANGE_CHECK_AUX_TRACE_OFFSET, RANGE_CHECK_AUX_TRACE_WIDTH);
 
-pub const OP_COUNTER_IDX: usize = 0;
-pub const OP_SPONGE_RANGE: Range<usize> = Range { start: 1, end: 5 };
-pub const CF_OP_BITS_RANGE: Range<usize> = Range { start: 5, end: 8 };
-pub const LD_OP_BITS_RANGE: Range<usize> = Range { start: 8, end: 13 };
-pub const HD_OP_BITS_RANGE: Range<usize> = Range { start: 13, end: 15 };
+// Chiplets auxiliary columns
+pub const CHIPLETS_AUX_TRACE_OFFSET: usize = HASHER_AUX_TRACE_RANGE.end;
+pub const CHIPLETS_AUX_TRACE_WIDTH: usize = 1;
+pub const CHIPLETS_AUX_TRACE_RANGE: Range<usize> =
+    range(CHIPLETS_AUX_TRACE_OFFSET, CHIPLETS_AUX_TRACE_WIDTH);
 
-// STACK LAYOUT
-// ------------------------------------------------------------------------------------------------
-//
-// ╒═══════════════════ user registers ════════════════════════╕
-//    0      1    2    .................................    31
-// ├─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┤
+// Hasher auxiliary columns
+pub const HASHER_AUX_TRACE_OFFSET: usize = RANGE_CHECK_AUX_TRACE_RANGE.end;
+pub const HASHER_AUX_TRACE_WIDTH: usize = 1;
+pub const HASHER_AUX_TRACE_RANGE: Range<usize> =
+    range(HASHER_AUX_TRACE_OFFSET, HASHER_AUX_TRACE_WIDTH);
 
-pub const MAX_PUBLIC_INPUTS: usize = 8;
-pub const MAX_OUTPUTS: usize = MAX_PUBLIC_INPUTS;
-pub const MAX_STACK_DEPTH: usize = 32;
+pub const AUX_TRACE_WIDTH: usize = CHIPLETS_AUX_TRACE_RANGE.end;
+
+/// Number of random elements available to the prover after the commitment to the main trace
+/// segment.
+pub const AUX_TRACE_RAND_ELEMENTS: usize = 16;

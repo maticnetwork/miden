@@ -1,75 +1,52 @@
-use crate::{
-    op_sponge,
-    opcodes::{OpHint, UserOps as OpCode},
-    BaseElement, FieldElement, BASE_CYCLE_LENGTH, HACC_NUM_ROUNDS, MAX_PUBLIC_INPUTS,
-    OP_SPONGE_WIDTH, PROGRAM_DIGEST_SIZE,
+use super::{
+    hasher::{self, Digest},
+    utils::{collections::Vec, Box},
+    Felt, FieldElement, Operation,
 };
 use core::fmt;
 
 pub mod blocks;
-use blocks::{Group, ProgramBlock};
+use blocks::CodeBlock;
 
-mod inputs;
-pub use inputs::ProgramInputs;
-
-mod hashing;
-use hashing::{hash_acc, hash_op, hash_seq};
-
-#[cfg(test)]
-mod tests;
+mod library;
+pub use library::Library;
 
 // PROGRAM
 // ================================================================================================
-#[derive(Clone)]
+/// A program which can be executed by the VM.
+///
+/// A program is described by a Merkelized Abstract Syntax Tree (MAST), where each node is a
+/// [CodeBlock]. Internal nodes describe control flow semantics of the program, while leaf nodes
+/// contain linear sequences of instructions which contain no control flow.
+#[derive(Clone, Debug)]
 pub struct Program {
-    root: Group,
-    hash: [u8; 32],
+    root: CodeBlock,
 }
 
 impl Program {
-    /// Constructs a new program from the specified root block.
-    pub fn new(root: Group) -> Program {
-        // make sure the root block starts with BEGIN operation
-        match &root.body()[0] {
-            ProgramBlock::Span(block) => {
-                let (op_code, _) = block.get_op(0);
-                assert!(
-                    op_code == OpCode::Begin,
-                    "a program must start with BEGIN operation"
-                );
-            }
-            _ => panic!("a program must start with a Span block"),
-        }
-
-        // compute program hash
-        let (v0, v1) = root.get_hash();
-        let hash = hash_acc(BaseElement::ZERO, v0, v1);
-        let mut hash_bytes = [0u8; 32];
-        hash_bytes.copy_from_slice(BaseElement::elements_as_bytes(&hash[..PROGRAM_DIGEST_SIZE]));
-
-        Program {
-            root,
-            hash: hash_bytes,
-        }
+    // CONSTRUCTOR
+    // --------------------------------------------------------------------------------------------
+    /// Constructs a new program from the specified code block.
+    pub fn new(root: CodeBlock) -> Self {
+        Self { root }
     }
-    /// Returns the root block of the program.
-    pub fn root(&self) -> &Group {
+
+    // PUBLIC ACCESSORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns the root code block of this program.
+    pub fn root(&self) -> &CodeBlock {
         &self.root
     }
 
-    /// Returns hash of the program.
-    pub fn hash(&self) -> &[u8; 32] {
-        &self.hash
+    /// Returns a hash of this program.
+    pub fn hash(&self) -> Digest {
+        self.root.hash()
     }
 }
 
-impl fmt::Debug for Program {
+impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut body_code = format!("{:?}", self.root);
-        // get rid of extra `begin` token
-        body_code.replace_range(..6, "");
-        write!(f, "{}", body_code)?;
-
-        Ok(())
+        write!(f, "begin {} end", self.root)
     }
 }

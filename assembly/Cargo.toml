@@ -1,6 +1,6 @@
 [package]
 name = "miden-assembly"
-version = "0.1.0"
+version = "0.2.0"
 description = "Miden VM assembly language"
 authors = ["miden contributors"]
 readme = "README.md"
@@ -8,16 +8,24 @@ license = "MIT"
 repository = "https://github.com/maticnetwork/miden"
 categories = ["compilers", "no-std"]
 keywords = ["assembler", "assembly", "language", "miden"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [lib]
 bench = false
 doctest = false
 
+[[bench]]
+name = "program_compilation"
+harness = false
+
 [features]
 default = ["std"]
-std = ["vm-core/std", "winter-utils/std"]
+std = ["vm-core/std"]
 
 [dependencies]
-vm-core = { package = "miden-core", path = "../core", version = "0.1", default-features = false }
-winter-utils = { package = "winter-utils", version = "0.2", default-features = false }
+vm-core = { package = "miden-core", path = "../core", version = "0.2", default-features = false }
+vm-stdlib = { package = "miden-stdlib", path = "../stdlib", version = "0.1", default-features = false }
+
+[dev-dependencies]
+criterion = "0.3"

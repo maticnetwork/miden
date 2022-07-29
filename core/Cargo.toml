@@ -1,6 +1,6 @@
 [package]
 name = "miden-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "Miden VM core components"
 authors = ["miden contributors"]
 readme = "README.md"
@@ -8,7 +8,8 @@ license = "MIT"
 repository = "https://github.com/maticnetwork/miden"
 categories = ["emulators", "no-std"]
 keywords = ["instruction-set", "miden", "program"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [lib]
 bench = false
@@ -16,8 +17,9 @@ doctest = false
 
 [features]
 default = ["std"]
-std = ["math/std", "winter-utils/std"]
+std = ["math/std", "winter-utils/std", "crypto/std"]
 
 [dependencies]
-math = { package = "winter-math", version = "0.2", default-features = false }
-winter-utils = { package = "winter-utils", version = "0.2", default-features = false }
+crypto = { package = "winter-crypto", version = "0.4", default-features = false }
+math = { package = "winter-math", version = "0.4", default-features = false }
+winter-utils = { package = "winter-utils", version = "0.4", default-features = false }

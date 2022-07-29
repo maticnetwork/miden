@@ -1,14 +1,15 @@
 [package]
 name = "miden-verifier"
-version = "0.1.0"
+version = "0.2.0"
 description="Miden VM execution verifier"
 authors = ["miden contributors"]
 readme="README.md"
-edition = "2018"
+license = "MIT"
 repository = "https://github.com/maticnetwork/miden"
 categories = ["cryptography", "no-std"]
 keywords = ["miden", "stark", "verifier", "zkp"]
-license = "MIT"
+edition = "2021"
+rust-version = "1.60"
 
 [lib]
 bench = false
@@ -16,9 +17,10 @@ doctest = false
 
 [features]
 default = ["std"]
-std = ["air/std", "assembly/std", "winterfell/std"]
+std = ["air/std", "assembly/std", "vm-core/std", "winterfell/std"]
 
 [dependencies]
-air = { package = "miden-air", path = "../air", version = "0.1", default-features = false }
-assembly = { package = "miden-assembly", path = "../assembly", version = "0.1", default-features = false }
-winterfell = { package = "winter-verifier", version = "0.2", default-features = false }
+air = { package = "miden-air", path = "../air", version = "0.2", default-features = false }
+assembly = { package = "miden-assembly", path = "../assembly", version = "0.2", default-features = false }
+vm-core = { package = "miden-core", path = "../core", version = "0.2", default-features = false }
+winterfell = { package = "winter-verifier", version = "0.4", default-features = false }

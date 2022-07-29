@@ -1,6 +1,8 @@
 use core::ops::Deref;
 use winter_air::{FieldExtension, HashFunction, ProofOptions as WinterProofOptions};
 
+/// TODO: add docs
+#[derive(Clone)]
 pub struct ProofOptions(WinterProofOptions);
 
 impl ProofOptions {
@@ -30,7 +32,7 @@ impl ProofOptions {
             8,
             16,
             HashFunction::Blake3_192,
-            FieldExtension::None,
+            FieldExtension::Quadratic,
             8,
             256,
         ))
@@ -42,7 +44,7 @@ impl ProofOptions {
             16,
             21,
             HashFunction::Blake3_256,
-            FieldExtension::Quadratic,
+            FieldExtension::Cubic,
             8,
             256,
         ))

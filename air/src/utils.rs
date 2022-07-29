@@ -1,11 +1,13 @@
-use crate::FieldElement;
+use super::FieldElement;
+use core::ops::Range;
+use vm_core::{utils::collections::Vec, utils::range as create_range};
 
-// BASIC CONSTRAINTS OPERATORS
+// BASIC CONSTRAINT OPERATORS
 // ================================================================================================
 
-#[inline(always)]
-pub fn is_zero<E: FieldElement>(v: E) -> E {
-    v
+/// Returns zero only when a == b.
+pub fn are_equal<E: FieldElement>(a: E, b: E) -> E {
+    a - b
 }
 
 #[inline(always)]
@@ -19,71 +21,8 @@ pub fn binary_not<E: FieldElement>(v: E) -> E {
 }
 
 #[inline(always)]
-pub fn are_equal<E: FieldElement>(v1: E, v2: E) -> E {
-    v1 - v2
-}
-
-// COMMON STACK CONSTRAINTS
-// ================================================================================================
-
-/// Enforces that stack values starting from `from_slot` haven't changed. All constraints in the
-/// `result` slice are filled in.
-pub fn enforce_stack_copy<E: FieldElement>(
-    result: &mut [E],
-    old_stack: &[E],
-    new_stack: &[E],
-    from_slot: usize,
-    op_flag: E,
-) {
-    for i in from_slot..result.len() {
-        result.agg_constraint(i, op_flag, are_equal(old_stack[i], new_stack[i]));
-    }
-}
-
-/// Enforces that values in the stack were shifted to the right by `num_slots`. Constraints in
-/// the `result` slice are filled in starting from `num_slots` index.
-pub fn enforce_right_shift<E: FieldElement>(
-    result: &mut [E],
-    old_stack: &[E],
-    new_stack: &[E],
-    num_slots: usize,
-    op_flag: E,
-) {
-    for i in num_slots..result.len() {
-        result.agg_constraint(
-            i,
-            op_flag,
-            are_equal(old_stack[i - num_slots], new_stack[i]),
-        );
-    }
-}
-
-/// Enforces that values in the stack were shifted to the left by `num_slots` starting from
-/// `from_slots`. All constraints in the `result` slice are filled in.
-pub fn enforce_left_shift<E: FieldElement>(
-    result: &mut [E],
-    old_stack: &[E],
-    new_stack: &[E],
-    from_slot: usize,
-    num_slots: usize,
-    op_flag: E,
-) {
-    // make sure values in the stack were shifted by `num_slots` to the left
-    let start_idx = from_slot - num_slots;
-    let remainder_idx = result.len() - num_slots;
-    for i in start_idx..remainder_idx {
-        result.agg_constraint(
-            i,
-            op_flag,
-            are_equal(old_stack[i + num_slots], new_stack[i]),
-        );
-    }
-
-    // also make sure that remaining slots were filled in with 0s
-    #[allow(clippy::needless_range_loop)]
-    for i in remainder_idx..result.len() {
-        result.agg_constraint(i, op_flag, is_zero(new_stack[i]));
-    }
+pub fn is_zero<E: FieldElement>(v: E) -> E {
+    v
 }
 
 // TRAIT TO SIMPLIFY CONSTRAINT AGGREGATION
@@ -105,63 +44,90 @@ impl<E: FieldElement> EvaluationResult<E> for Vec<E> {
     }
 }
 
-// TESTS
+// TRANSITION CONSTRAINT RANGE
 // ================================================================================================
 
+/// Manages the starting index and length of transition constraints for individual processors so
+/// indices can be handled easily during transition evaluation.
+#[derive(Debug)]
+pub struct TransitionConstraintRange {
+    pub(super) range_checker: Range<usize>,
+    pub(super) chiplets: Range<usize>,
+}
+
+impl TransitionConstraintRange {
+    pub fn new(sys: usize, range_checker_len: usize, chiplets_len: usize) -> Self {
+        let range_checker = create_range(sys, range_checker_len);
+        let chiplets = create_range(range_checker.end, chiplets_len);
+
+        Self {
+            range_checker,
+            chiplets,
+        }
+    }
+}
+
+// MACRO TO SIMPLIFY RANGE HANDLING
+// ================================================================================================
+/// Select an array range from a mutable result array and a specified range.
+#[macro_export]
+macro_rules! select_result_range {
+    ($result:expr, $range:expr) => {
+        &mut $result[$range.start..$range.end]
+    };
+}
+
+// TESTS
+// ================================================================================================
 #[cfg(test)]
 mod tests {
-    use vm_core::{utils::ToElements, BaseElement, FieldElement};
+    use super::TransitionConstraintRange;
+    use vm_core::utils::range as create_range;
 
     #[test]
-    fn enforce_left_shift() {
-        let op_flag = BaseElement::ONE;
+    fn transition_constraint_ranges() {
+        let sys_constraints_len = 1;
+        let range_constraints_len = 2;
+        let aux_constraints_len = 3;
 
-        // sift left by 1 starting from 1
-        let mut result = vec![BaseElement::ZERO; 8];
-        super::enforce_left_shift(
-            &mut result,
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            1,
-            1,
-            op_flag,
+        let constraint_ranges = TransitionConstraintRange::new(
+            sys_constraints_len,
+            range_constraints_len,
+            aux_constraints_len,
         );
-        assert_eq!([1, 1, 1, 1, 1, 1, 1, 8].to_elements(), result);
 
-        // sift left by 2 starting from 2
-        let mut result = vec![BaseElement::ZERO; 8];
-        super::enforce_left_shift(
-            &mut result,
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            2,
-            2,
-            op_flag,
+        assert_eq!(constraint_ranges.range_checker.start, sys_constraints_len);
+        assert_eq!(
+            constraint_ranges.range_checker.end,
+            sys_constraints_len + range_constraints_len
         );
-        assert_eq!([2, 2, 2, 2, 2, 2, 7, 8].to_elements(), result);
+        assert_eq!(
+            constraint_ranges.chiplets.start,
+            sys_constraints_len + range_constraints_len
+        );
+        assert_eq!(
+            constraint_ranges.chiplets.end,
+            sys_constraints_len + range_constraints_len + aux_constraints_len
+        );
+    }
 
-        // sift left by 1 starting from 2
-        let mut result = vec![BaseElement::ZERO; 8];
-        super::enforce_left_shift(
-            &mut result,
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            2,
-            1,
-            op_flag,
-        );
-        assert_eq!([0, 1, 1, 1, 1, 1, 1, 8].to_elements(), result);
+    #[test]
+    fn result_range() {
+        let mut result: [u64; 6] = [1, 2, 3, 4, 5, 6];
 
-        // sift left by 4 starting from 6
-        let mut result = vec![BaseElement::ZERO; 8];
-        super::enforce_left_shift(
-            &mut result,
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            &[1, 2, 3, 4, 5, 6, 7, 8].to_elements(),
-            6,
-            4,
-            op_flag,
-        );
-        assert_eq!([0, 0, 4, 4, 5, 6, 7, 8].to_elements(), result);
+        // Select the beginning.
+        let range = create_range(0, 3);
+        let selected_range = select_result_range!(&mut result, range);
+        assert_eq!(selected_range, [1, 2, 3]);
+
+        // Select the middle.
+        let range = create_range(1, 2);
+        let selected_range = select_result_range!(&mut result, range);
+        assert_eq!(selected_range, [2, 3]);
+
+        // Select the end.
+        let range = create_range(5, 1);
+        let selected_range = select_result_range!(&mut result, range);
+        assert_eq!(selected_range, [6]);
     }
 }

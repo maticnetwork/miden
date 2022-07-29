@@ -1,0 +1,1499 @@
+# Given [x, ...] on stack top, this routine computes [y, ...]
+# such that y = σ_0(x), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L73-L79
+proc.small_sigma_0
+    dup
+    u32unchecked_rotr.7
+
+    swap
+
+    dup
+    u32unchecked_rotr.18
+
+    swap
+
+    u32unchecked_shr.3
+
+    u32checked_xor
+    u32checked_xor
+end
+
+# Given [x, ...] on stack top, this routine computes [y, ...]
+# such that y = σ_1(x), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L81-L87
+proc.small_sigma_1
+    dup
+    u32unchecked_rotr.17
+
+    swap
+
+    dup
+    u32unchecked_rotr.19
+
+    swap
+
+    u32unchecked_shr.10
+
+    u32checked_xor
+    u32checked_xor
+end
+
+# Given [x, ...] on stack top, this routine computes [y, ...]
+# such that y = Σ_0(x), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L57-L63
+proc.cap_sigma_0
+    dup
+    u32unchecked_rotr.2
+
+    swap
+
+    dup
+    u32unchecked_rotr.13
+
+    swap
+
+    u32unchecked_rotr.22
+
+    u32checked_xor
+    u32checked_xor
+end
+
+# Given [x, ...] on stack top, this routine computes [y, ...]
+# such that y = Σ_1(x), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L65-L71
+proc.cap_sigma_1
+    dup
+    u32unchecked_rotr.6
+
+    swap
+
+    dup
+    u32unchecked_rotr.11
+
+    swap
+
+    u32unchecked_rotr.25
+
+    u32checked_xor
+    u32checked_xor
+end
+
+# Given [x, y, z, ...] on stack top, this routine computes [o, ...]
+# such that o = ch(x, y, z), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L37-L45
+proc.ch
+    swap
+    dup.1
+    u32checked_and
+
+    swap
+    u32checked_not
+
+    movup.2
+    u32checked_and
+
+    u32checked_xor
+end
+
+# Given [x, y, z, ...] on stack top, this routine computes [o, ...]
+# such that o = maj(x, y, z), as defined in SHA specification
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L47-L55
+proc.maj
+    dup.1
+    dup.1
+    u32checked_and
+
+    swap
+    dup.3
+    u32checked_and
+
+    movup.2
+    movup.3
+    u32checked_and
+
+    u32checked_xor
+    u32checked_xor
+end
+
+# Given [a, b, c, d, ...] on stack top, this routine reverses order of first 
+# four elements on stack top such that final stack state looks like [d, c, b, a, ...]
+proc.rev_element_order
+    swap
+    movup.2
+    movup.3
+end
+
+# Given [a, b, c, d, ...] on stack top, this routine computes next message schedule word
+# using following formula
+#
+# t0 = small_sigma_1(a) + b
+# t1 = small_sigma_0(c) + d
+# return t0 + t1
+#
+# If to be computed message schedule word has index i ∈ [16, 64), then 
+# a, b, c, d will have following indices in message schedule
+#
+# a = msg[i - 2]
+# b = msg[i - 7]
+# c = msg[i - 15]
+# d = msg[i - 16]
+proc.compute_message_schedule_word
+    exec.small_sigma_1
+    movup.2
+    exec.small_sigma_0
+
+    u32overflowing_add3
+    drop
+    u32wrapping_add
+end
+
+# Given eight working variables of SHA256 ( i.e. hash state ), a 32 -bit round constant & 
+# 32 -bit message word on stack top, this routine consumes constant & message word into 
+# hash state.
+#
+# Expected stack state looks like
+#
+# [a, b, c, d, e, f, g, h, CONST_i, WORD_i] | i ∈ [0, 64)
+#
+# After finishing execution, stack looks like
+#
+# [a', b', c', d', e', f', g', h']
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2_256.hpp#L165-L175
+proc.consume_message_word
+    dup.6
+    dup.6
+    dup.6
+    exec.ch
+
+    movup.9
+    movup.10
+
+    u32overflowing_add3
+    drop
+
+    dup.5
+    exec.cap_sigma_1
+
+    movup.9
+    u32overflowing_add3
+    drop
+
+    dup.3
+    dup.3
+    dup.3
+    exec.maj
+
+    dup.2
+    exec.cap_sigma_0
+
+    u32wrapping_add
+
+    movup.5
+    dup.2
+    u32wrapping_add
+    movdn.5
+
+    u32wrapping_add
+end
+
+# Given 32 -bytes hash state ( in terms of 8 SHA256 words ) and 64 -bytes input 
+# message ( in terms of 16 SHA256 words ) on stack top, this routine computes
+# whole message schedule of 64 message words and consumes them into hash state.
+#
+# Expected stack state:
+#
+# [state0, state1, state2, state3, state4, state5, state6, state7, msg0, msg1, msg2, msg3, msg4, msg5, msg6, msg7, msg8, msg9, msg10, msg11, msg12, msg13, msg14, msg15]
+#
+# Final stack state after completion of execution
+#
+# [state0', state1', state2', state3', state4', state5', state6', state7']
+#
+# Note, each SHA256 word is 32 -bit wide
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2.hpp#L89-L113
+# & https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2_256.hpp#L148-L187 ( loop body execution when i = 0 )
+proc.prepare_message_schedule_and_consume.2
+    popw.local.0
+    popw.local.1
+
+    dup.15
+    dup.15
+
+    dup.11
+    swap
+    dup.4
+    dup.4
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[16]
+
+    swap
+    dup.12
+    swap
+    dup.5
+    dup.5
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[17]
+
+    dup.1
+    dup.14
+    swap
+    dup.7
+    dup.7
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[18]
+
+    dup.15
+    dup.2
+    dup.9
+    dup.9
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[19]
+
+    swapw
+
+    push.0x428a2f98
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[0]
+
+    push.0x71374491
+    movdn.8
+    exec.consume_message_word # consume msg[1]
+
+    push.0xb5c0fbcf
+    movdn.8
+    exec.consume_message_word # consume msg[2]
+
+    push.0xe9b5dba5
+    movdn.8
+    exec.consume_message_word # consume msg[3]
+
+    popw.local.0
+    popw.local.1
+
+    dup.15
+    dup.15
+    dup.15
+
+    dup.4
+    dup.9
+    dup.9
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[20]
+
+    swap
+    dup.3
+    dup.10
+    dup.10
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[21]
+
+    movup.2
+    dup.2
+    dup.11
+    dup.11
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[22]
+
+    dup.6
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[23]
+
+    movupw.2
+
+    push.0x3956c25b
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[4]
+
+    push.0x59f111f1
+    movdn.8
+    exec.consume_message_word # consume msg[5]
+
+    push.0x923f82a4
+    movdn.8
+    exec.consume_message_word # consume msg[6]
+
+    push.0xab1c5ed5
+    movdn.8
+    exec.consume_message_word # consume msg[7]
+
+    popw.local.0
+    popw.local.1
+
+    dup.6
+    dup.2
+    dup.11
+    dup.11
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[24]
+
+    dup.6
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[25]
+
+    dup.6
+    dup.2
+    dup.15
+    dup.15
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[26]
+
+    dup.15
+    dup.15
+    swap
+    dup.8
+    dup.4
+    exec.compute_message_schedule_word # computed msg[27]
+
+    movupw.3
+
+    push.0xd807aa98
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[8]
+
+    push.0x12835b01
+    movdn.8
+    exec.consume_message_word # consume msg[9]
+
+    push.0x243185be
+    movdn.8
+    exec.consume_message_word # consume msg[10]
+
+    push.0x550c7dc3
+    movdn.8
+    exec.consume_message_word # consume msg[11]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+    movupw.3
+
+    dup.14
+    dup.10
+    dup.7
+    dup.7
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[28]
+
+    dup.14
+    dup.10
+    dup.9
+    dup.9
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[29]
+
+    dup.14
+    dup.2
+    dup.11
+    dup.11
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[30]
+
+    dup.14
+    dup.2
+    dup.8
+    dup.13
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[31]
+
+    movupw.2
+
+    push.0x72be5d74
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[12]
+
+    push.0x80deb1fe
+    movdn.8
+    exec.consume_message_word # consume msg[13]
+
+    push.0x9bdc06a7
+    movdn.8
+    exec.consume_message_word # consume msg[14]
+
+    push.0xc19bf174
+    movdn.8
+    exec.consume_message_word # consume msg[15]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[32]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[33]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[34]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[35]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0xe49b69c1
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[16]
+
+    push.0xefbe4786
+    movdn.8
+    exec.consume_message_word # consume msg[17]
+
+    push.0x0fc19dc6
+    movdn.8
+    exec.consume_message_word # consume msg[18]
+
+    push.0x240ca1cc
+    movdn.8
+    exec.consume_message_word # consume msg[19]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[36]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[37]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[38]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[39]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0x2de92c6f
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[20]
+
+    push.0x4a7484aa
+    movdn.8
+    exec.consume_message_word # consume msg[21]
+
+    push.0x5cb0a9dc
+    movdn.8
+    exec.consume_message_word # consume msg[22]
+
+    push.0x76f988da
+    movdn.8
+    exec.consume_message_word # consume msg[23]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[40]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[41]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[42]
+
+    dup.10
+    dup.2
+    dup.13
+    dup.9
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[43]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0x983e5152
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[24]
+
+    push.0xa831c66d
+    movdn.8
+    exec.consume_message_word # consume msg[25]
+
+    push.0xb00327c8
+    movdn.8
+    exec.consume_message_word # consume msg[26]
+
+    push.0xbf597fc7
+    movdn.8
+    exec.consume_message_word # consume msg[27]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[44]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[45]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[46]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[47]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0xc6e00bf3
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[28]
+
+    push.0xd5a79147
+    movdn.8
+    exec.consume_message_word # consume msg[29]
+
+    push.0x06ca6351
+    movdn.8
+    exec.consume_message_word # consume msg[30]
+
+    push.0x14292967
+    movdn.8
+    exec.consume_message_word # consume msg[31]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[48]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[49]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[50]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[51]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0x27b70a85
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[32]
+
+    push.0x2e1b2138
+    movdn.8
+    exec.consume_message_word # consume msg[33]
+
+    push.0x4d2c6dfc
+    movdn.8
+    exec.consume_message_word # consume msg[34]
+
+    push.0x53380d13
+    movdn.8
+    exec.consume_message_word # consume msg[35]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[52]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[53]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[54]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[55]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0x650a7354
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[36]
+
+    push.0x766a0abb
+    movdn.8
+    exec.consume_message_word # consume msg[37]
+
+    push.0x81c2c92e
+    movdn.8
+    exec.consume_message_word # consume msg[38]
+
+    push.0x92722c85
+    movdn.8
+    exec.consume_message_word # consume msg[39]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[56]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[57]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[58]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[59]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0xa2bfe8a1
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[40]
+
+    push.0xa81a664b
+    movdn.8
+    exec.consume_message_word # consume msg[41]
+
+    push.0xc24b8b70
+    movdn.8
+    exec.consume_message_word # consume msg[42]
+
+    push.0xc76c51a3
+    movdn.8
+    exec.consume_message_word # consume msg[43]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.3
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[60]
+
+    dup.14
+    dup.6
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[61]
+
+    dup.14
+    dup.2
+    dup.13
+    dup.13
+    movdn.3
+    movdn.3
+    exec.compute_message_schedule_word # computed msg[62]
+
+    dup.10
+    dup.2
+    dup.8
+    dup.14
+    movdn.3
+    movdn.2
+    exec.compute_message_schedule_word # computed msg[63]
+
+    movupw.3
+    exec.rev_element_order
+
+    push.0xd192e819
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[44]
+
+    push.0xd6990624
+    movdn.8
+    exec.consume_message_word # consume msg[45]
+
+    push.0xf40e3585
+    movdn.8
+    exec.consume_message_word # consume msg[46]
+
+    push.0x106aa070
+    movdn.8
+    exec.consume_message_word # consume msg[47]
+
+    popw.local.0
+    popw.local.1
+
+    movupw.2
+    movupw.3
+    movupw.3
+
+    exec.rev_element_order
+
+    push.0x19a4c116
+    pushw.local.1
+    pushw.local.0
+    exec.consume_message_word # consume msg[48]
+
+    push.0x1e376c08
+    movdn.8
+    exec.consume_message_word # consume msg[49]
+
+    push.0x2748774c
+    movdn.8
+    exec.consume_message_word # consume msg[50]
+
+    push.0x34b0bcb5
+    movdn.8
+    exec.consume_message_word # consume msg[51]
+
+    movupw.2
+    exec.rev_element_order
+    movdnw.2
+
+    push.0x391c0cb3
+    movdn.8
+    exec.consume_message_word # consume msg[52]
+
+    push.0x4ed8aa4a
+    movdn.8
+    exec.consume_message_word # consume msg[53]
+
+    push.0x5b9cca4f
+    movdn.8
+    exec.consume_message_word # consume msg[54]
+
+    push.0x682e6ff3
+    movdn.8
+    exec.consume_message_word # consume msg[55]
+
+    movupw.2
+    exec.rev_element_order
+    movdnw.2
+
+    push.0x748f82ee
+    movdn.8
+    exec.consume_message_word # consume msg[56]
+
+    push.0x78a5636f
+    movdn.8
+    exec.consume_message_word # consume msg[57]
+
+    push.0x84c87814
+    movdn.8
+    exec.consume_message_word # consume msg[58]
+
+    push.0x8cc70208
+    movdn.8
+    exec.consume_message_word # consume msg[59]
+
+    movupw.2
+    exec.rev_element_order
+    movdnw.2
+
+    push.0x90befffa
+    movdn.8
+    exec.consume_message_word # consume msg[60]
+
+    push.0xa4506ceb
+    movdn.8
+    exec.consume_message_word # consume msg[61]
+
+    push.0xbef9a3f7
+    movdn.8
+    exec.consume_message_word # consume msg[62]
+
+    push.0xc67178f2
+    movdn.8
+    exec.consume_message_word # consume msg[63]
+
+    push.0x6a09e667
+    u32wrapping_add
+
+    swap
+    push.0xbb67ae85
+    u32wrapping_add
+    swap
+
+    movup.2
+    push.0x3c6ef372
+    u32wrapping_add
+    movdn.2
+
+    movup.3
+    push.0xa54ff53a
+    u32wrapping_add
+    movdn.3
+
+    movup.4
+    push.0x510e527f
+    u32wrapping_add
+    movdn.4
+
+    movup.5
+    push.0x9b05688c
+    u32wrapping_add
+    movdn.5
+
+    movup.6
+    push.0x1f83d9ab
+    u32wrapping_add
+    movdn.6
+
+    movup.7
+    push.0x5be0cd19
+    u32wrapping_add
+    movdn.7
+end
+
+# Given 32 -bytes hash state ( in terms of 8 SHA256 words ) and precomputed message 
+# schedule of padding bytes ( in terms of 64 message words ), this routine consumes
+# that into hash state, leaving final hash state, which is 32 -bytes SHA256 digest.
+#
+# Note, in SHA256 2-to-1 hashing, 64 -bytes are padded, which is processed as second message
+# block ( each SHA256 message block is 64 -bytes wide ). That message block is used for generating 
+# message schedule of 64 SHA256 words. That's exactly what can be precomputed & is consumed here 
+# ( in this routine ) into provided hash state.
+#
+# Expected stack state:
+#
+# [state0, state1, state2, state3, state4, state5, state6, state7, ...]
+#
+# Final stack state after completion of execution
+#
+# [state0', state1', state2', state3', state4', state5', state6', state7']
+#
+# Note, each SHA256 word is 32 -bit wide
+#
+# See https://github.com/itzmeanjan/merklize-sha/blob/8a2c006/include/sha2_256.hpp#L148-L187 ( loop 
+# body execution when i = 1 i.e. consuming padding bytes )
+proc.consume_padding_message_schedule
+    dupw.1
+    dupw.1
+
+    push.2147483648
+    movdn.8
+    push.0x428a2f98
+    movdn.8
+    exec.consume_message_word # consume msg[0]
+
+    push.0
+    movdn.8
+    push.0x71374491
+    movdn.8
+    exec.consume_message_word # consume msg[1]
+
+    push.0
+    movdn.8
+    push.0xb5c0fbcf
+    movdn.8
+    exec.consume_message_word # consume msg[2]
+
+    push.0
+    movdn.8
+    push.0xe9b5dba5
+    movdn.8
+    exec.consume_message_word # consume msg[3]
+
+    push.0
+    movdn.8
+    push.0x3956c25b
+    movdn.8
+    exec.consume_message_word # consume msg[4]
+
+    push.0
+    movdn.8
+    push.0x59f111f1
+    movdn.8
+    exec.consume_message_word # consume msg[5]
+
+    push.0
+    movdn.8
+    push.0x923f82a4
+    movdn.8
+    exec.consume_message_word # consume msg[6]
+
+    push.0
+    movdn.8
+    push.0xab1c5ed5
+    movdn.8
+    exec.consume_message_word # consume msg[7]
+
+    push.0
+    movdn.8
+    push.0xd807aa98
+    movdn.8
+    exec.consume_message_word # consume msg[8]
+
+    push.0
+    movdn.8
+    push.0x12835b01
+    movdn.8
+    exec.consume_message_word # consume msg[9]
+
+    push.0
+    movdn.8
+    push.0x243185be
+    movdn.8
+    exec.consume_message_word # consume msg[10]
+
+    push.0
+    movdn.8
+    push.0x550c7dc3
+    movdn.8
+    exec.consume_message_word # consume msg[11]
+
+    push.0
+    movdn.8
+    push.0x72be5d74
+    movdn.8
+    exec.consume_message_word # consume msg[12]
+
+    push.0
+    movdn.8
+    push.0x80deb1fe
+    movdn.8
+    exec.consume_message_word # consume msg[13]
+
+    push.0
+    movdn.8
+    push.0x9bdc06a7
+    movdn.8
+    exec.consume_message_word # consume msg[14]
+
+    push.512
+    movdn.8
+    push.0xc19bf174
+    movdn.8
+    exec.consume_message_word # consume msg[15]
+
+    push.2147483648
+    movdn.8
+    push.0xe49b69c1
+    movdn.8
+    exec.consume_message_word # consume msg[16]
+
+    push.20971520
+    movdn.8
+    push.0xefbe4786
+    movdn.8
+    exec.consume_message_word # consume msg[17]
+
+    push.2117632
+    movdn.8
+    push.0x0fc19dc6
+    movdn.8
+    exec.consume_message_word # consume msg[18]
+
+    push.20616
+    movdn.8
+    push.0x240ca1cc
+    movdn.8
+    exec.consume_message_word # consume msg[19]
+
+    push.570427392
+    movdn.8
+    push.0x2de92c6f
+    movdn.8
+    exec.consume_message_word # consume msg[20]
+
+    push.575995924
+    movdn.8
+    push.0x4a7484aa
+    movdn.8
+    exec.consume_message_word # consume msg[21]
+
+    push.84449090
+    movdn.8
+    push.0x5cb0a9dc
+    movdn.8
+    exec.consume_message_word # consume msg[22]
+
+    push.2684354592
+    movdn.8
+    push.0x76f988da
+    movdn.8
+    exec.consume_message_word # consume msg[23]
+
+    push.1518862336
+    movdn.8
+    push.0x983e5152
+    movdn.8
+    exec.consume_message_word # consume msg[24]
+
+    push.6067200
+    movdn.8
+    push.0xa831c66d
+    movdn.8
+    exec.consume_message_word # consume msg[25]
+
+    push.1496221
+    movdn.8
+    push.0xb00327c8
+    movdn.8
+    exec.consume_message_word # consume msg[26]
+
+    push.4202700544
+    movdn.8
+    push.0xbf597fc7
+    movdn.8
+    exec.consume_message_word # consume msg[27]
+
+    push.3543279056
+    movdn.8
+    push.0xc6e00bf3
+    movdn.8
+    exec.consume_message_word # consume msg[28]
+
+    push.291985753
+    movdn.8
+    push.0xd5a79147
+    movdn.8
+    exec.consume_message_word # consume msg[29]
+
+    push.4142317530
+    movdn.8
+    push.0x06ca6351
+    movdn.8
+    exec.consume_message_word # consume msg[30]
+
+    push.3003913545
+    movdn.8
+    push.0x14292967
+    movdn.8
+    exec.consume_message_word # consume msg[31]
+
+    push.145928272
+    movdn.8
+    push.0x27b70a85
+    movdn.8
+    exec.consume_message_word # consume msg[32]
+
+    push.2642168871
+    movdn.8
+    push.0x2e1b2138
+    movdn.8
+    exec.consume_message_word # consume msg[33]
+
+    push.216179603
+    movdn.8
+    push.0x4d2c6dfc
+    movdn.8
+    exec.consume_message_word # consume msg[34]
+
+    push.2296832490
+    movdn.8
+    push.0x53380d13
+    movdn.8
+    exec.consume_message_word # consume msg[35]
+
+    push.2771075893
+    movdn.8
+    push.0x650a7354
+    movdn.8
+    exec.consume_message_word # consume msg[36]
+
+    push.1738633033
+    movdn.8
+    push.0x766a0abb
+    movdn.8
+    exec.consume_message_word # consume msg[37]
+
+    push.3610378607
+    movdn.8
+    push.0x81c2c92e
+    movdn.8
+    exec.consume_message_word # consume msg[38]
+
+    push.1324035729
+    movdn.8
+    push.0x92722c85
+    movdn.8
+    exec.consume_message_word # consume msg[39]
+
+    push.1572820453
+    movdn.8
+    push.0xa2bfe8a1
+    movdn.8
+    exec.consume_message_word # consume msg[40]
+
+    push.2397971253
+    movdn.8
+    push.0xa81a664b
+    movdn.8
+    exec.consume_message_word # consume msg[41]
+
+    push.3803995842
+    movdn.8
+    push.0xc24b8b70
+    movdn.8
+    exec.consume_message_word # consume msg[42]
+
+    push.2822718356
+    movdn.8
+    push.0xc76c51a3
+    movdn.8
+    exec.consume_message_word # consume msg[43]
+
+    push.1168996599
+    movdn.8
+    push.0xd192e819
+    movdn.8
+    exec.consume_message_word # consume msg[44]
+
+    push.921948365
+    movdn.8
+    push.0xd6990624
+    movdn.8
+    exec.consume_message_word # consume msg[45]
+
+    push.3650881000
+    movdn.8
+    push.0xf40e3585
+    movdn.8
+    exec.consume_message_word # consume msg[46]
+
+    push.2958106055
+    movdn.8
+    push.0x106aa070
+    movdn.8
+    exec.consume_message_word # consume msg[47]
+
+    push.1773959876
+    movdn.8
+    push.0x19a4c116
+    movdn.8
+    exec.consume_message_word # consume msg[48]
+
+    push.3172022107
+    movdn.8
+    push.0x1e376c08
+    movdn.8
+    exec.consume_message_word # consume msg[49]
+
+    push.3820646885
+    movdn.8
+    push.0x2748774c
+    movdn.8
+    exec.consume_message_word # consume msg[50]
+
+    push.991993842
+    movdn.8
+    push.0x34b0bcb5
+    movdn.8
+    exec.consume_message_word # consume msg[51]
+
+    push.419360279
+    movdn.8
+    push.0x391c0cb3
+    movdn.8
+    exec.consume_message_word # consume msg[52]
+
+    push.3797604839
+    movdn.8
+    push.0x4ed8aa4a
+    movdn.8
+    exec.consume_message_word # consume msg[53]
+
+    push.322392134
+    movdn.8
+    push.0x5b9cca4f
+    movdn.8
+    exec.consume_message_word # consume msg[54]
+
+    push.85264541
+    movdn.8
+    push.0x682e6ff3
+    movdn.8
+    exec.consume_message_word # consume msg[55]
+
+    push.1326255876
+    movdn.8
+    push.0x748f82ee
+    movdn.8
+    exec.consume_message_word # consume msg[56]
+
+    push.640108622
+    movdn.8
+    push.0x78a5636f
+    movdn.8
+    exec.consume_message_word # consume msg[57]
+
+    push.822159570
+    movdn.8
+    push.0x84c87814
+    movdn.8
+    exec.consume_message_word # consume msg[58]
+
+    push.3328750644
+    movdn.8
+    push.0x8cc70208
+    movdn.8
+    exec.consume_message_word # consume msg[59]
+
+    push.1107837388
+    movdn.8
+    push.0x90befffa
+    movdn.8
+    exec.consume_message_word # consume msg[60]
+
+    push.1657999800
+    movdn.8
+    push.0xa4506ceb
+    movdn.8
+    exec.consume_message_word # consume msg[61]
+
+    push.3852183409
+    movdn.8
+    push.0xbef9a3f7
+    movdn.8
+    exec.consume_message_word # consume msg[62]
+
+    push.2242356356
+    movdn.8
+    push.0xc67178f2
+    movdn.8
+    exec.consume_message_word # consume msg[63]
+
+    movup.8
+    u32wrapping_add
+
+    swap
+    movup.8
+    u32wrapping_add
+    swap
+
+    movup.2
+    movup.8
+    u32wrapping_add
+    movdn.2
+
+    movup.3
+    movup.8
+    u32wrapping_add
+    movdn.3
+
+    movup.4
+    movup.8
+    u32wrapping_add
+    movdn.4
+
+    movup.5
+    movup.8
+    u32wrapping_add
+    movdn.5
+
+    movup.6
+    movup.8
+    u32wrapping_add
+    movdn.6
+
+    movup.7
+    movup.8
+    u32wrapping_add
+    movdn.7
+end
+
+# Given 64 -bytes input, this routine computes 32 -bytes SAH256 digest
+#
+# Expected stack state:
+#
+# [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15] | m[0,16) = 32 -bit word
+#
+# Note, each SHA256 word is 32 -bit wide, so that's how input is expected.
+# If you've 64 -bytes, consider packing 4 consecutive bytes into single word, 
+# maintaining big endian byte order.
+#
+# Final stack state:
+#
+# [dig0, dig1, dig2, dig3, dig4, dig5, dig6, dig7]
+#
+# SHA256 digest is represented in terms of eight 32 -bit words ( big endian byte order ).
+export.hash
+    push.0x5be0cd19.0x1f83d9ab.0x9b05688c.0x510e527f
+    push.0xa54ff53a.0x3c6ef372.0xbb67ae85.0x6a09e667
+
+    exec.prepare_message_schedule_and_consume
+    exec.consume_padding_message_schedule
+end

@@ -1,15 +1,30 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
+
 use vm_core::{
-    opcodes::{OpHint, UserOps as OpCode},
-    program::{
-        blocks::{Group, Loop, ProgramBlock, Span, Switch},
-        Program,
+    code_blocks::CodeBlock,
+    utils::{
+        collections::{BTreeMap, Vec},
+        string::{String, ToString},
     },
-    BaseElement, FieldElement, StarkField, BASE_CYCLE_LENGTH,
+    Library, Program,
 };
-use winter_utils::collections::BTreeMap;
+use vm_stdlib::StdLibrary;
+
+mod context;
+use context::AssemblyContext;
+
+mod procedures;
+use procedures::Procedure;
 
 mod parsers;
-use parsers::*;
+use parsers::{combine_blocks, parse_code_blocks};
+
+mod tokens;
+use tokens::{Token, TokenStream};
 
 mod errors;
 pub use errors::AssemblyError;
@@ -17,332 +32,250 @@ pub use errors::AssemblyError;
 #[cfg(test)]
 mod tests;
 
+// CONSTANTS
+// ================================================================================================
+
+const MODULE_PATH_DELIM: &str = "::";
+
 // TYPE ALIASES
 // ================================================================================================
 
-type HintMap = BTreeMap<usize, OpHint>;
+type ProcMap = BTreeMap<String, Procedure>;
+type ModuleMap = BTreeMap<String, ProcMap>;
 
-// ASSEMBLY COMPILER
+// ASSEMBLER
 // ================================================================================================
 
-/// Compiles provided assembly code into a program.
-pub fn compile(source: &str) -> Result<Program, AssemblyError> {
-    // break assembly string into tokens
-    let tokens: Vec<&str> = source.split_whitespace().collect();
-
-    // perform basic validation
-    if tokens.is_empty() {
-        return Err(AssemblyError::empty_program());
-    } else if tokens[0] != "begin" {
-        return Err(AssemblyError::invalid_program_start(tokens[0]));
-    } else if tokens[tokens.len() - 1] != "end" {
-        return Err(AssemblyError::invalid_program_end(tokens[tokens.len() - 1]));
-    }
-
-    // read the program from the token stream
-    let mut root_blocks = Vec::new();
-    let i = parse_branch(&mut root_blocks, &tokens, 0)?;
-    let root = Group::new(root_blocks);
-
-    // make sure there is nothing left after the last token
-    if i < tokens.len() - 1 {
-        return Err(AssemblyError::dangling_instructions(i));
-    }
-
-    // build and return the program
-    Ok(Program::new(root))
+/// TODO: add comments
+pub struct Assembler {
+    stdlib: StdLibrary,
+    parsed_modules: ModuleMap,
+    in_debug_mode: bool,
 }
 
-// PARSER FUNCTIONS
-// ================================================================================================
-
-/// Parses a single program block from the `token` stream, and appends this block to the `parent`
-/// list of blocks.
-fn parse_block(
-    parent: &mut Vec<ProgramBlock>,
-    tokens: &[&str],
-    mut i: usize,
-) -> Result<usize, AssemblyError> {
-    // read the block header
-    let head: Vec<&str> = tokens[i].split('.').collect();
-
-    // based on the block header, figure out what type of a block we are dealing with
-    match head[0] {
-        "block" => {
-            // make sure block head instruction is valid
-            if head.len() > 1 {
-                return Err(AssemblyError::invalid_block_head(&head, i));
-            }
-            // then parse the body of the block, add the new block to the parent, and return
-            let mut body = Vec::new();
-            i = parse_branch(&mut body, tokens, i)?;
-            parent.push(Group::new_block(body));
-            Ok(i + 1)
+impl Assembler {
+    // CONSTRUCTOR
+    // --------------------------------------------------------------------------------------------
+    /// Returns a new instance of [Assembler] instantiated with empty module map.
+    /// Debug related decorators are added to span blocks when debug mode is on.
+    pub fn new(in_debug_mode: bool) -> Self {
+        Self {
+            stdlib: StdLibrary::default(),
+            parsed_modules: BTreeMap::new(),
+            in_debug_mode,
         }
-        "if" => {
-            // make sure block head is valid
-            if head.len() == 1 || head[1] != "true" {
-                return Err(AssemblyError::invalid_block_head(&head, i));
-            }
-
-            // parse the body of the true branch
-            let mut t_branch = Vec::new();
-            i = parse_branch(&mut t_branch, tokens, i)?;
-
-            // if the false branch is present, parse it as well; otherwise
-            // create an empty false branch
-            let mut f_branch = Vec::new();
-            if tokens[i] == "else" {
-                i = parse_branch(&mut f_branch, tokens, i)?;
-            } else {
-                f_branch.push(Span::new_block(vec![
-                    OpCode::Not,
-                    OpCode::Assert,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                    OpCode::Noop,
-                ]));
-            }
-
-            // create a Switch block, add it to the parent, and return
-            parent.push(Switch::new_block(t_branch, f_branch));
-            Ok(i + 1)
-        }
-        "repeat" => {
-            // read and validate number of loop iterations
-            let num_iterations = read_param(&head, i)? as usize;
-            if num_iterations < 2 {
-                return Err(AssemblyError::invalid_num_iterations(&head, i));
-            }
-
-            // parse loop body
-            let mut body_template = Vec::new();
-            i = parse_branch(&mut body_template, tokens, i)?;
-
-            // duplicate loop body as many times as needed
-            let body = repeat_block_sequence(body_template, num_iterations);
-
-            // create a Group block with all iterations expanded, and return
-            parent.push(Group::new_block(body));
-            Ok(i + 1)
-        }
-        "while" => {
-            // make sure block head is valid
-            if head.len() == 1 || head[1] != "true" {
-                return Err(AssemblyError::invalid_block_head(&head, i));
-            }
-            // then parse the body of the block, add the new block to the parent, and return
-            let mut body = Vec::new();
-            i = parse_branch(&mut body, tokens, i)?;
-            parent.push(Loop::new_block(body));
-            Ok(i + 1)
-        }
-        _ => Err(AssemblyError::invalid_block_head(&head, i)),
     }
-}
 
-/// Builds a body of a program block by parsing tokens from the stream and transforming
-/// them into program blocks.
-fn parse_branch(
-    body: &mut Vec<ProgramBlock>,
-    tokens: &[&str],
-    mut i: usize,
-) -> Result<usize, AssemblyError> {
-    // determine starting instructions of the branch based on branch head
-    let mut head: Vec<&str> = tokens[i].split('.').collect();
-    let mut op_codes: Vec<OpCode> = match head[0] {
-        "begin" => {
-            // this is a first block of a program
-            head[0] = "block";
-            vec![OpCode::Begin]
-        }
-        "block" => vec![],
-        "if" => vec![OpCode::Assert],
-        "else" => vec![OpCode::Not, OpCode::Assert],
-        "repeat" => vec![],
-        "while" => vec![OpCode::Assert],
-        _ => return Err(AssemblyError::invalid_block_head(&head, i)),
-    };
-    let mut op_hints: HintMap = BTreeMap::new();
+    // PROGRAM COMPILER
+    // --------------------------------------------------------------------------------------------
 
-    // save first step to check for empty branches
-    let first_step = i;
-    i += 1;
+    /// Compiles the provided source code into a [Program]. The resulting program can be executed
+    /// on Miden VM.
+    pub fn compile(&self, source: &str) -> Result<Program, AssemblyError> {
+        let mut tokens = TokenStream::new(source)?;
+        let mut context = AssemblyContext::new();
 
-    // iterate over tokens and parse them one by one until the end of the block is reached;
-    // if a new block is encountered, parse it recursively
-    while i < tokens.len() {
-        let op: Vec<&str> = tokens[i].split('.').collect();
-        i = match op[0] {
-            "block" | "if" | "repeat" | "while" => {
-                let force_span = body.is_empty();
-                add_span(body, &mut op_codes, &mut op_hints, force_span);
-                parse_block(body, tokens, i)?
-            }
-            "else" => {
-                if head[0] != "if" {
-                    return Err(AssemblyError::dangling_else(i));
-                } else if i - first_step < 2 {
-                    return Err(AssemblyError::empty_block(&head, first_step));
+        // parse imported modules (if any), and add exported procedures from these modules to the
+        // current context; since we are in the root context here, we initialize dependency chain
+        // with an empty vector.
+        self.parse_imports(&mut tokens, &mut context, &mut Vec::new())?;
+
+        // parse locally defined procedures (if any), and add these procedures to the current
+        // context
+        while let Some(token) = tokens.read() {
+            let proc = match token.parts()[0] {
+                Token::PROC | Token::EXPORT => {
+                    Procedure::parse(&mut tokens, &context, false, self.in_debug_mode)?
                 }
-                add_span(body, &mut op_codes, &mut op_hints, false);
-                return Ok(i);
-            }
-            "end" => {
-                if i - first_step < 2 {
-                    return Err(AssemblyError::empty_block(&head, first_step));
+                _ => break,
+            };
+            context.add_local_proc(proc);
+        }
+
+        // make sure program body is present
+        let next_token = tokens
+            .read()
+            .ok_or_else(|| AssemblyError::unexpected_eof(tokens.pos()))?;
+        if next_token.parts()[0] != Token::BEGIN {
+            return Err(AssemblyError::unexpected_token(next_token, Token::BEGIN));
+        }
+
+        // parse program body and return the resulting program
+        let program_root = parse_program(&mut tokens, &context, self.in_debug_mode)?;
+        Ok(Program::new(program_root))
+    }
+
+    // IMPORT PARSERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Parses `use` instructions from the token stream.
+    ///
+    /// For each `use` instructions, retrieves exported procedures from the specified module and
+    /// inserts them into the provided context.
+    ///
+    /// If a module specified by `use` instruction hasn't been parsed yet, parses it, and adds
+    /// the parsed module to `self.parsed_modules`.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The `use` instruction is malformed.
+    /// - A module specified by the `use` instruction could not be found.
+    /// - Parsing the specified module results in an error.
+    fn parse_imports<'a>(
+        &'a self,
+        tokens: &mut TokenStream,
+        context: &mut AssemblyContext<'a>,
+        dep_chain: &mut Vec<String>,
+    ) -> Result<(), AssemblyError> {
+        // read tokens from the token stream until all `use` tokens are consumed
+        while let Some(token) = tokens.read() {
+            match token.parts()[0] {
+                Token::USE => {
+                    // parse the `use` instruction to extract module path from it
+                    let module_path = &token.parse_use()?;
+
+                    // check if a module with the same path is currently being parsed somewhere up
+                    // the chain; if it is, then we have a circular dependency.
+                    if dep_chain.iter().any(|v| v == module_path) {
+                        dep_chain.push(module_path.clone());
+                        return Err(AssemblyError::circular_module_dependency(token, dep_chain));
+                    }
+
+                    // add the current module to the dependency chain
+                    dep_chain.push(module_path.clone());
+
+                    // if the module hasn't been parsed yet, retrieve its source from the library
+                    // and attempt to parse it; if the parsing is successful, this will also add
+                    // the parsed module to `self.parsed_modules`
+                    if !self.parsed_modules.contains_key(module_path) {
+                        let module_source =
+                            self.stdlib.get_module_source(module_path).map_err(|_| {
+                                AssemblyError::missing_import_source(token, module_path)
+                            })?;
+                        self.parse_module(module_source, module_path, dep_chain)?;
+                    }
+
+                    // get procedures from the module at the specified path; we are guaranteed to
+                    // not fail here because the above code block ensures that either there is a
+                    // parsed module for the specified path, or the function returns with an error
+                    let module_procs = self
+                        .parsed_modules
+                        .get(module_path)
+                        .expect("no module procs");
+
+                    // add all procedures to the current context; procedure labels are set to be
+                    // `last_part_of_module_path::procedure_name`. For example, `u256::add`.
+                    for proc in module_procs.values() {
+                        let path_parts = module_path.split(MODULE_PATH_DELIM).collect::<Vec<_>>();
+                        let num_parts = path_parts.len();
+                        context.add_imported_proc(path_parts[num_parts - 1], proc);
+                    }
+
+                    // consume the `use` token and pop the current module of the dependency chain
+                    tokens.advance();
+                    dep_chain.pop();
                 }
-                add_span(body, &mut op_codes, &mut op_hints, false);
-                return Ok(i);
+                _ => break,
             }
-            _ => parse_op_token(op, &mut op_codes, &mut op_hints, i)?,
-        };
+        }
+
+        Ok(())
     }
 
-    // if all tokens were consumed by block end was not found, return an error
-    match head[0] {
-        "block" => Err(AssemblyError::unmatched_block(first_step)),
-        "if" => Err(AssemblyError::unmatched_if(first_step)),
-        "else" => Err(AssemblyError::unmatched_else(first_step)),
-        "repeat" => Err(AssemblyError::unmatched_repeat(first_step, &head)),
-        "while" => Err(AssemblyError::unmatched_while(first_step)),
-        _ => Err(AssemblyError::invalid_block_head(&head, first_step)),
+    /// Parses a set of exported procedures from the specified source code and adds these
+    /// procedures to `self.parsed_modules` using the specified path as the key.
+    #[allow(clippy::cast_ref_to_mut)]
+    fn parse_module(
+        &self,
+        source: &str,
+        path: &str,
+        dep_chain: &mut Vec<String>,
+    ) -> Result<(), AssemblyError> {
+        let mut tokens = TokenStream::new(source)?;
+        let mut context = AssemblyContext::new();
+
+        // parse imported modules (if any), and add exported procedures from these modules to
+        // the current context
+        self.parse_imports(&mut tokens, &mut context, dep_chain)?;
+
+        // parse procedures defined in the module, and add these procedures to the current
+        // context
+        while let Some(token) = tokens.read() {
+            let proc = match token.parts()[0] {
+                Token::PROC | Token::EXPORT => {
+                    Procedure::parse(&mut tokens, &context, true, self.in_debug_mode)?
+                }
+                _ => break,
+            };
+            context.add_local_proc(proc);
+        }
+
+        // make sure there are no dangling instructions after all procedures have been read
+        if !tokens.eof() {
+            let token = tokens.read().expect("no token before eof");
+            return Err(AssemblyError::dangling_ops_after_module(token, path));
+        }
+
+        // extract the exported local procedures from the context
+        let mut module_procs = context.into_local_procs();
+        module_procs.retain(|_, p| p.is_export());
+
+        // insert exported procedures into `self.parsed_procedures`
+        // TODO: figure out how to do this using interior mutability
+        unsafe {
+            let path = path.to_string();
+            let mutable_self = &mut *(self as *const _ as *mut Assembler);
+            mutable_self.parsed_modules.insert(path, module_procs);
+        }
+
+        Ok(())
     }
 }
 
-/// Transforms an assembly instruction into a sequence of one or more VM instructions.
-fn parse_op_token(
-    op: Vec<&str>,
-    op_codes: &mut Vec<OpCode>,
-    op_hints: &mut HintMap,
-    step: usize,
-) -> Result<usize, AssemblyError> {
-    // based on the instruction, invoke the correct parser for the operation
-    match op[0] {
-        "noop" => parse_noop(op_codes, &op, step),
-        "assert" => parse_assert(op_codes, &op, step),
-
-        "push" => parse_push(op_codes, op_hints, &op, step),
-        "read" => parse_read(op_codes, &op, step),
-
-        "dup" => parse_dup(op_codes, &op, step),
-        "pad" => parse_pad(op_codes, &op, step),
-        "pick" => parse_pick(op_codes, &op, step),
-        "drop" => parse_drop(op_codes, &op, step),
-        "swap" => parse_swap(op_codes, &op, step),
-        "roll" => parse_roll(op_codes, &op, step),
-
-        "add" => parse_add(op_codes, &op, step),
-        "sub" => parse_sub(op_codes, &op, step),
-        "mul" => parse_mul(op_codes, &op, step),
-        "div" => parse_div(op_codes, &op, step),
-        "neg" => parse_neg(op_codes, &op, step),
-        "inv" => parse_inv(op_codes, &op, step),
-        "not" => parse_not(op_codes, &op, step),
-        "and" => parse_and(op_codes, &op, step),
-        "or" => parse_or(op_codes, &op, step),
-
-        "eq" => parse_eq(op_codes, op_hints, &op, step),
-        "ne" => parse_ne(op_codes, op_hints, &op, step),
-        "gt" => parse_gt(op_codes, op_hints, &op, step),
-        "lt" => parse_lt(op_codes, op_hints, &op, step),
-        "rc" => parse_rc(op_codes, op_hints, &op, step),
-        "isodd" => parse_isodd(op_codes, op_hints, &op, step),
-
-        "choose" => parse_choose(op_codes, &op, step),
-
-        "hash" => parse_hash(op_codes, &op, step),
-        "smpath" => parse_smpath(op_codes, &op, step),
-        "pmpath" => parse_pmpath(op_codes, op_hints, &op, step),
-
-        _ => return Err(AssemblyError::invalid_op(&op, step)),
-    }?;
-
-    // advance instruction pointer to the next step
-    Ok(step + 1)
+impl Default for Assembler {
+    /// Returns a new instance of [Assembler] instantiated with empty module map in non-debug mode.
+    fn default() -> Self {
+        Self::new(false)
+    }
 }
 
-// HELPER FUNCTIONS
+// PARSERS
 // ================================================================================================
 
-/// Adds a new Span block to a program block body based on currently parsed instructions.
-fn add_span(
-    body: &mut Vec<ProgramBlock>,
-    op_codes: &mut Vec<OpCode>,
-    op_hints: &mut HintMap,
-    force: bool,
-) {
-    // if there were no instructions in the current span, don't do anything
-    if op_codes.is_empty() && !force {
-        return;
-    };
+/// TODO: add comments
+fn parse_program(
+    tokens: &mut TokenStream,
+    context: &AssemblyContext,
+    in_debug_mode: bool,
+) -> Result<CodeBlock, AssemblyError> {
+    let program_start = tokens.pos();
+    // consume the 'begin' token
+    let header = tokens.read().expect("missing program header");
+    header.validate_begin()?;
+    tokens.advance();
 
-    // pad the instructions to make ensure 16-cycle alignment
-    let mut span_op_codes = op_codes.clone();
-    let pad_length = BASE_CYCLE_LENGTH - (span_op_codes.len() % BASE_CYCLE_LENGTH) - 1;
-    span_op_codes.resize(span_op_codes.len() + pad_length, OpCode::Noop);
+    // parse the program body
+    let root = parse_code_blocks(tokens, context, 0, in_debug_mode)?;
 
-    // add a new Span block to the body
-    body.push(ProgramBlock::Span(Span::new(
-        span_op_codes,
-        op_hints.clone(),
-    )));
-
-    // clear op_codes and op_hints for the next Span block
-    op_codes.clear();
-    op_hints.clear();
-}
-
-fn repeat_block_sequence(template: Vec<ProgramBlock>, num_iterations: usize) -> Vec<ProgramBlock> {
-    let mut body = Vec::with_capacity(template.len() * num_iterations);
-
-    let last_idx = template.len() - 1;
-    if !template[last_idx].is_span() {
-        for _ in 0..num_iterations {
-            body.extend_from_slice(&template);
-        }
-    } else {
-        body.extend_from_slice(&template);
-        for _ in 1..num_iterations {
-            let last_idx = body.len() - 1;
-            body[last_idx] = merge_spans(&body[last_idx], &template[0]);
-            body.extend_from_slice(&template[1..]);
-        }
-    }
-
-    body
-}
-
-fn merge_spans(span1: &ProgramBlock, span2: &ProgramBlock) -> ProgramBlock {
-    match span1 {
-        ProgramBlock::Span(first_span) => match span2 {
-            ProgramBlock::Span(last_span) => ProgramBlock::Span(Span::merge(first_span, last_span)),
-            _ => panic!("span1 is not a Span block"),
+    // consume the 'end' token
+    match tokens.read() {
+        None => Err(AssemblyError::unmatched_begin(
+            tokens.read_at(program_start).expect("no begin token"),
+        )),
+        Some(token) => match token.parts()[0] {
+            Token::END => token.validate_end(),
+            Token::ELSE => Err(AssemblyError::dangling_else(token)),
+            _ => Err(AssemblyError::unmatched_begin(
+                tokens.read_at(program_start).expect("no begin token"),
+            )),
         },
-        _ => panic!("span2 is not a Span block"),
+    }?;
+    tokens.advance();
+
+    // make sure there are no instructions after the end
+    if let Some(token) = tokens.read() {
+        return Err(AssemblyError::dangling_ops_after_program(token));
     }
-}
 
-fn read_param(op: &[&str], step: usize) -> Result<u32, AssemblyError> {
-    if op.len() > 2 {
-        return Err(AssemblyError::extra_param(op, step));
-    }
-
-    // try to parse the parameter value
-    let result = match op[1].parse::<u32>() {
-        Ok(i) => i,
-        Err(_) => return Err(AssemblyError::invalid_param(op, step)),
-    };
-
-    Ok(result)
+    Ok(root)
 }

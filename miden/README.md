@@ -1,4 +1,7 @@
 # Miden VM
+
+> This documentation has some deprecated snippets, this means that should be use just as reference to study purpose. It'll be rewritten in a near future.
+
 This crate contains an implementation of Miden VM. It can be used to execute Miden VM programs and to verify correctness of program execution.
 
 ## Overview
@@ -14,7 +17,7 @@ All arithmetic operations (e.g., addition, multiplication) happen in the same pr
 Besides being field elements, values in Miden VM are untyped. However, some operations expect binary values and will fail if you attempt to execute them using non-binary values. Binary values are values which are either `0` or `1`.
 
 ### Programs
-Programs in Miden VM are structured as an [execution graph](../core/doc/programs.md) of program blocks each consisting of a sequence of VM [instructions](../core/doc/isa.md). There are two ways of constructing such a graph:
+Programs in Miden VM are structured as an [execution graph (deprecated documentation)](/../main/core/doc/programs.md) of program blocks each consisting of a sequence of VM [instructions (deprecated documentation)](/../main/core/doc/isa.md). There are two ways of constructing such a graph:
 
 1. You can manually build it from blocks of raw Miden VM instructions.
 2. You can compile [Miden assembly](../assembly) source code into it.
@@ -34,10 +37,10 @@ Values remaining on the stack after a program is executed can be returned as pro
 Currently, Miden VM has no random access memory - all values live on the stack. However, a memory module will be added in the future to enable saving values to and reading values from RAM.
 
 ### Program hash
-All Miden programs can be reduced to a single 32-byte value, called program hash. Once a `Program` object is constructed (e.g. by compiling assembly code), you can access this hash via `Program::hash()` method. This hash value is used by a verifier when they verify program execution. This ensure that the verifier verifies execution of a specific program (e.g. a program which the prover had committed to previously). The methodology for computing program hash is described [here](../core/doc/programs.md#Program-hash).
+All Miden programs can be reduced to a single 32-byte value, called program hash. Once a `Program` object is constructed (e.g. by compiling assembly code), you can access this hash via `Program::hash()` method. This hash value is used by a verifier when they verify program execution. This ensure that the verifier verifies execution of a specific program (e.g. a program which the prover had committed to previously). The methodology for computing program hash is described [here (deprecated documentation)](/../main/core/doc/programs.md#Program-hash).
 
 ## Usage
-Miden crate exposes `execute()` and `verify()` functions which can be used to execute programs and verify their execution. Both are explained below, but you can also take a look at several working examples [here](../examples).
+Miden crate exposes `prove()` and `verify()` functions which can be used to execute programs and verify their execution. Both are explained below, but you can also take a look at several working examples [here](src/examples) and find instructions for running them via cli [here](#examples).
 
 ### Executing a program 
 To execute a program on Miden VM, you can use `execute()` function. The function takes the following parameters:
@@ -131,7 +134,7 @@ dup.2       // stack state: 1 2 1 2
 drop        // stack state: 2 1 2
 add         // stack state: 3 2
 ```
-Notice that except for the first 2 operations which initialize the stack, the sequence of `swap dup.2 drop add` operations repeats over and over. In fact, we can repeat these operations an arbitrary number of times to compute an arbitrary Fibonacci number. In Rust, it would like like this (this is actually a simplified version of the example in [fibonacci.rs](../examples/src/fibonacci.rs)):
+Notice that except for the first 2 operations which initialize the stack, the sequence of `swap dup.2 drop add` operations repeats over and over. In fact, we can repeat these operations an arbitrary number of times to compute an arbitrary Fibonacci number. In Rust, it would like like this (this is actually a simplified version of the example in [fibonacci.rs](src/examples/src/fibonacci.rs)):
 ```Rust
 use miden::{assembly, ProgramInputs, ProofOptions};
 
@@ -179,6 +182,89 @@ To compile with `no_std`, disable default features via `--no-default-features` f
 
 ### Concurrent proof generation
 When compiled with `concurrent` feature enabled, the VM will generate STARK proofs using multiple threads. The number of threads can be configured via `RAYON_NUM_THREADS` environment variable, and usually defaults to the number of logical cores on the machine. For benefits of concurrent proof generation check out these [benchmarks](../README.md#Performance).
+
+
+## Examples
+This crate contains several examples of Miden VM programs and demonstrates how these programs can be executed on Miden VM.
+
+## Running examples
+To run examples of executing programs and verifying proofs of their execution, do the following:
+
+First, compile an optimized version of the `miden` binary by running:
+```
+cargo build --release --features executable
+```
+Or, if you want to compile the with multi-threaded support enabled, run:
+```
+cargo build --release --features "executable concurrent"
+```
+
+In either case, the binary will be located in `target/release` directory, and you can run it like so:
+```
+./target/release/miden [FLAGS] [OPTIONS] <SUBCOMMAND>
+```
+Where each example can be invoked using a distinct subcommand. To view the list of all available options and examples you can look up help like so:
+
+```
+./target/release/miden -h
+```
+This will print out something similar to this:
+```
+Miden 0.1.0
+Miden examples
+USAGE:
+    miden.exe [OPTIONS] <SUBCOMMAND>
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+OPTIONS:
+    -s, --security <security>    Security level for execution proofs generated by the VM [default: 96bits]
+SUBCOMMANDS:
+    collatz        Compute a Collatz sequence from the specified starting value
+    comparison     If provided value is less than 9, multiplies it by 9; otherwise add 9 to it
+    conditional    If provided value is 0, outputs 15; if provided value is 1, outputs 8
+    fib            Compute a Fibonacci sequence of the specified length
+    help           Prints this message or the help of the given subcommand(s)
+    merkle         Computes a root of a randomly generated Merkle branch of the specified depth
+    range          Determines how many of the randomly generated values are less than 2^63
+```
+
+Currently, the only available option for all examples is `-s` for specifying security level for the generated proofs. This can be set to one of two values:
+* *96bits* - for 96-bit security level (the default).
+* *128bits* - for 128-bit security level.
+
+For example, to execute Fibonacci calculator at 128-bit security level, you can run the following:
+```
+./target/release/miden -s 128bits fib
+```
+
+### Example-specific options
+
+To view additional options available for specific examples, you can run the following:
+```
+./target/release/miden help <example name>
+```
+For example, executing:
+```
+./target/release/miden help collatz
+```
+Will print something like this:
+```
+miden.exe-collatz 0.1.0
+Compute a Collatz sequence from the specified starting value
+USAGE:
+    miden.exe collatz [OPTIONS]
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+OPTIONS:
+    -n <start-value>        Starting value of the Collatz sequence [default: 511]
+```
+
+Thus, to compute Collatz sequence with a different starting value, you could execute something like this:
+```
+./target/release/miden collatz -n 513
+```
 
 ## License
 This project is [MIT licensed](../LICENSE).

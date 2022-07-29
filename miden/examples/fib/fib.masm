@@ -1,0 +1,5 @@
+begin
+    repeat.1000
+        swap dup.1 add
+    end
+end
