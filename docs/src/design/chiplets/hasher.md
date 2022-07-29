@@ -358,6 +358,7 @@ v_h = \alpha_0 + \alpha_1 \cdot m + \alpha_2 \cdot r + \alpha_3 \cdot i \\
 v_a = \sum_{j=0}^{3}(\alpha_{j+4} \cdot h_j) \\
 v_b = \sum_{j=4}^{7}(\alpha_{j+4} \cdot h_j) \\
 v_c = \sum_{j=8}^{11}(\alpha_{j+4} \cdot h_j) \\
+v_d = \sum_{j=8}^{11}(\alpha_j \cdot h_j) \\
 $$
 
 In the above:
@@ -365,6 +366,7 @@ In the above:
 - $m$ is a _transition label_ which uniquely identifies each transition function.
 - $v_h$ is a _common header_ which is a combination of transition label, row address, and node index.
 - $v_a$, $v_b$, $v_c$ are the first, second, and third words (4 elements) of the hasher state.
+- $v_d$ is the third word of the hasher state but computed using the same $\alpha$ values as used for the second word. This is needed for computing the value of $v_{leaf}$ below to ensure that the same $\alpha$ values are used for the leaf node regardless of which part of the state the node comes from.
 
 #### Hash chiplet bus constraints
 As described previously, running product column $p_0$ is used to tie the hash chiplet with the main VM's stack. When receiving inputs from or returning results to the stack, hash chiplet multiplies $p_0$ by their respective values. On other other side, when sending inputs to the hash chiplet or receiving results from the chiplet, the stack divides $p_0$ by their values.
